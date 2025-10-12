@@ -13,8 +13,29 @@ type lisp_val =
   | LBuiltinFunction of string * (environment -> lisp_val -> lisp_val)
   (* a function is a name, a parameter list, and function body. *)
   | LFunction of string * lisp_val * lisp_val
+  (* a macro is exactly the same as a function, with the distinction
+  that it receives all of its arguments completely unevaluated
+  in a compiled lisp this would probably make more of a difference *)
+  | LMacro of string * lisp_val * lisp_val
   | LQuoted of lisp_val
 and environment = (string, lisp_val) Hashtbl.t list
+
+
+let env_add env s v =
+  match env with
+  | [] -> ()
+  | e1 :: _ ->  Hashtbl.add e1 s v
+
+let env_new_lexical env = 
+  let h = Hashtbl.create 16 in
+  h :: env
+
+let rec env_root env =
+  match env with
+  | [] -> raise (Invalid_argument "Empty environment passed to env_root!")
+  | e :: [] -> e
+  | _ :: t -> env_root t
+
 
 
 let rec dbg_print_one v =
@@ -28,7 +49,9 @@ let rec dbg_print_one v =
   | LDouble d -> pf "<double: %f>" d
   | LBuiltinFunction (name, _) -> pf "<builtin: %s>" name
   | LFunction (name, args, _) -> pf "<function: '%s' lambda-list: %s>" 
-    name ((dbg_print_one args))
+    name (dbg_print_one args)
+  | LMacro (name, args, _) -> pf "<function '%s' lambda-list: %s>"
+    name (dbg_print_one args)
   | LQuoted v -> pf "<quote: %s>" (dbg_print_one v)
   (*| _ -> "<Something else>"*)
 

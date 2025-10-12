@@ -4,21 +4,13 @@ open InterpreterStdlib;;
 
 let default_env: environment = [Hashtbl.create 1024];;
 
-let env_add env s v =
-  match env with
-  | [] -> ()
-  | e1 :: _ ->  Hashtbl.add e1 s v
-
-let env_new_lexical env = 
-  let h = Hashtbl.create 16 in
-  h :: env
-
 let add_builtin s f =
   env_add default_env s (LBuiltinFunction (s, f))
 let () = add_builtin "+" iadd
 let () = add_builtin "-" isub
 let () = add_builtin "car" car
 let () = add_builtin "cdr" cdr
+let () = add_builtin "bind-function" bind_function
 
 let make_env () = [Hashtbl.copy (List.hd default_env)]
 
@@ -42,6 +34,7 @@ let rec eval_one env v =
   | LCons (func, args) -> eval_call env func args
   | LBuiltinFunction (n, f) -> LBuiltinFunction (n, f)
   | LFunction (n, l, f) -> LFunction (n, l, f)
+  | LMacro (n, l, f) -> LMacro (n, l, f)
   | LQuoted v -> v
 
 (* Evaluate a list of values, without evaluating the resulting
@@ -83,6 +76,9 @@ and eval_apply env func args =
   | LFunction (_, l, b) ->
     bind_args l args;
     eval_body lexical_env b
+  | LMacro (_, l, b) ->
+    bind_args l args;
+    eval_body lexical_env b
   | _ -> LNil
     
 
@@ -91,10 +87,10 @@ and eval_call env func args =
   match eval_one env func with
   | LBuiltinFunction (_, f) -> f env (eval_list env args)
   | LFunction (n, l, b) -> eval_apply env (LFunction (n, l, b)) (eval_list env args)
+  | LMacro (n, l, b) -> eval_apply env (LMacro (n, l, b)) args
   | v -> raise (Invalid_argument 
         (Printf.sprintf "eval_apply: cannot call non-function object %s" (dbg_print_one v)));;
 
-let eval_all vs =
-  let env = make_env () in
+let eval_all env vs =
   let ev v = eval_one env v in
   List.map ev vs

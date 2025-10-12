@@ -44,3 +44,18 @@ let cdr _ vs =
   | LCons (LCons (_, b), LNil) -> b
   | _ -> raise (Invalid_argument "cdr: invalid argument")
 
+
+(* This is the special built-in function that allows us to create
+a new function. 
+
+(bind-function 'sym '(a b) '(+ a b))
+*)
+let bind_function env vs =
+  let root = [env_root env] in
+  let rais () = raise (Invalid_argument "not enough args to bind-function") in
+  match vs with
+  | LCons (LSymbol sym, LCons (ll, body)) ->
+    let f = (LFunction (sym, ll, body)) in
+    env_add root sym f; f
+
+  | _ -> rais ()
