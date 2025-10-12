@@ -1,0 +1,9 @@
+(library
+ (name lisp)
+ ;(modules ast read lexer parser)
+ )
+
+(include_subdirs unqualified)
+
+(menhir (modules parser))
+(ocamllex lexer)
