@@ -9,6 +9,7 @@
 %token LPAREN
 %token RPAREN
 %token QUOTE
+%token DOT
 %token EOF
 
 %start <Ast.lisp_val option> prog
@@ -25,10 +26,11 @@ expr:
   | s = SYM { LSymbol s }
   | s = STR { LString (String.uppercase_ascii s) }
   | LPAREN; l = lisp_list_rest { l }
-  | QUOTE; e = expr { LQuoted e}
+  | QUOTE; e = expr { LCons (LSymbol "quote", LCons (e, LNil)) }
 ;
 
 lisp_list_rest:
   | RPAREN { LNil }
+  | DOT; e = expr; RPAREN { e }
   | e = expr; lr = lisp_list_rest { LCons (e, lr) }
 ;

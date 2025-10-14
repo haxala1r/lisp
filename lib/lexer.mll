@@ -11,7 +11,6 @@ let number_sign = '-' | '+'
 let int = number_sign? digit+
 let double = digit* '.' digit+ | digit+ '.' digit*
 
-
 let white = [' ' '\t']+
 let newline = '\r' | '\n' | "\r\n"
 
@@ -31,5 +30,6 @@ rule read =
     | '(' { LPAREN }
     | ')' { RPAREN }
     | '\'' { QUOTE }
+    | '.' { DOT }
     | _ { raise (SyntaxError ("Unexpected char: " ^ Lexing.lexeme lexbuf))}
     | eof { EOF }
