@@ -51,11 +51,10 @@ a new function.
 (bind-function 'sym '(a b) '(+ a b))
 *)
 let bind_function env vs =
-  let root = [env_root env] in
   let rais () = raise (Invalid_argument "not enough args to bind-function") in
   match vs with
   | LCons (LSymbol sym, LCons (ll, body)) ->
-    let f = (LFunction (sym, ll, body)) in
-    env_add root sym f; f
-
+    let f = (LFunction (sym, env_copy env, ll, body)) in
+    env_set_global env sym f;
+    f
   | _ -> rais ()
