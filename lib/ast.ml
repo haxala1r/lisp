@@ -19,6 +19,7 @@ type lisp_val =
   that it receives all of its arguments completely unevaluated
   in a compiled lisp this would probably make more of a difference *)
   | LMacro of string * environment * lisp_val * lisp_val
+  | LUnnamedMacro of environment * lisp_val * lisp_val
   | LQuoted of lisp_val
 and environment = (string, lisp_val) Hashtbl.t list
 
@@ -59,7 +60,9 @@ let rec dbg_print_one v =
     (dbg_print_one args)
   | LFunction (name, _, args, _) -> pf "<function: '%s' lambda-list: %s>" 
     name (dbg_print_one args)
-  | LMacro (name, _, args, _) -> pf "<function '%s' lambda-list: %s>"
+  | LUnnamedMacro (_, args, _) -> pf "<unnamed macro, lambda-list: %s>"
+    (dbg_print_one args)
+  | LMacro (name, _, args, _) -> pf "<macro '%s' lambda-list: %s>"
     name (dbg_print_one args)
   | LQuoted v -> pf "<quote: %s>" (dbg_print_one v)
   (*| _ -> "<Something else>"*)

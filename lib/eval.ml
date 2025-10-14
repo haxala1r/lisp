@@ -8,12 +8,6 @@ let add_builtin s f =
   env_set_global default_env s (LBuiltinFunction (s, f))
 let add_special s f =
   env_set_global default_env s (LBuiltinSpecial (s, f))
-let () = add_builtin "+" iadd
-let () = add_builtin "-" isub
-let () = add_builtin "car" car
-let () = add_builtin "cdr" cdr
-let () = add_builtin "bind-symbol" bind_symbol 
-let () = add_special "lambda" lambda
 
 let make_env () = [Hashtbl.copy (List.hd default_env)]
 
@@ -52,12 +46,16 @@ and eval_body env body =
 and err s = raise (Invalid_argument s)
 and bind_args env = function
   | LNil -> (function
-      | LNil -> () | _ -> err "bind_args")
+      | LNil -> ()
+      | _ -> err "cannot bind arguments")
+  | LSymbol s ->
+    (function
+      | v -> env_set_local env s v; ())
   | LCons (LSymbol hl, tl) -> (function
       | LCons (ha, ta) -> 
         env_set_local env hl ha;
         bind_args env tl ta;
-      | _ -> err "bind_args")
+      | _ -> err "cannot bind arguments")
   | _ -> fun _ -> err "bind_args"
   
 and eval_apply args = function
@@ -66,6 +64,7 @@ and eval_apply args = function
     let lexical_env = env_new_lexical e in
     bind_args lexical_env l args;
     eval_body lexical_env b
+  | LUnnamedMacro (e, l, b)
   | LMacro (_, e, l, b) ->
     let lexical_env = env_new_lexical e in
     bind_args lexical_env l args;
@@ -86,10 +85,45 @@ and eval_call env func args =
   | LFunction _ -> eval_apply (eval_list env args) func
   (* Macros are the same, they just return code that *will* be evaluated
   in the calling environment *)
-  | LMacro _ -> eval_apply args func
+  | LUnnamedMacro _
+  | LMacro _ -> eval_one env (eval_apply args func)
   | v -> raise (Invalid_argument 
-        (Printf.sprintf "eval_apply: cannot call non-function object %s" (dbg_print_one v)));;
+                  (Printf.sprintf "eval_apply: cannot call non-function object %s" (dbg_print_one v)))
+
+and (* This only creates a *local* binding, contained to the body given. *)
+  bind_local env =
+  function
+  | LCons (LSymbol s, LCons (v, body)) ->
+    let e = env_new_lexical env in
+    env_set_local e s v;
+    eval_body e body
+  | _ -> invalid_arg "invalid argument to bind-local"
+
 
 let eval_all env vs =
   let ev v = eval_one env v in
   List.map ev vs
+
+let () = add_builtin "+" iadd
+let () = add_builtin "-" isub
+let () = add_builtin "car" car
+let () = add_builtin "cdr" cdr
+let () = add_builtin "cons" cons
+let () = add_builtin "bind-symbol" bind_symbol 
+let () = add_builtin "list" lisp_list
+let () = add_special "lambda" lambda
+let () = add_special "lambda-macro" lambda_macro
+let () = add_special "let-one" bind_local
+let () = add_special "quote" (fun _ -> function
+    | LCons (x, LNil) -> x
+                         | _ -> invalid_arg "hmm")
+
+(* I know this looks insane. please trust me. *)
+let _ = eval_all default_env (Read.parse_str "
+(bind-symbol 'defun
+  (lambda-macro (name lm . body)
+    (list 'bind-symbol (list 'quote name) (cons 'lambda (cons lm body)))))
+(bind-symbol 'defmacro
+  (lambda-macro (name lm . body)
+    (list 'bind-symbol (list 'quote name) (cons 'lambda-macro (cons lm body)))))")
+

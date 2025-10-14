@@ -44,6 +44,13 @@ let cdr _ vs =
   | LCons (LCons (_, b), LNil) -> b
   | _ -> raise (Invalid_argument "cdr: invalid argument")
 
+let cons _ vs =
+  match vs with
+  | LCons (a, LCons (b, LNil)) -> LCons (a, b)
+  | _ -> invalid_arg "invalid args to cons!"
+
+let lisp_list _ vs = vs
+
 
 (* This is the special built-in function that allows us to create
 a new function.
@@ -57,16 +64,23 @@ let bind_symbol env =
   (* Special case for setting a function to a symbol, if the function
      is a lambda then we turn it into a real "function" by giving it this
      new name *)
+  | LCons (LQuoted (LSymbol s), LCons (LLambda (e, l, b), LNil))
   | LCons (LSymbol s, LCons (LLambda (e, l, b), LNil)) ->
     let f = LFunction (s, e, l, b) in
     env_set_global env s f;
     f
+  | LCons (LQuoted (LSymbol s), LCons (v, LNil))
   | LCons (LSymbol s, LCons (v, LNil)) ->
     env_set_global env s v;
     v
   | _ -> raise (Invalid_argument "invalid args to set!")
+           
 
 let lambda env = function
   | LCons (l, body) ->
     LLambda (env, l, body)
   | _ -> raise (Invalid_argument "invalid args to lambda!")
+
+let lambda_macro env = function
+  | LCons (l, body) -> LUnnamedMacro (env, l, body)
+  | _ -> invalid_arg "invalid args to lambda-macro"
