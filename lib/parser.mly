@@ -15,20 +15,20 @@
 %%
 
 prog:
-    | EOF { None }
-    | e = expr { Some e }
-    ;
+  | EOF { None }
+  | e = expr { Some e }
+;
 
 expr:
-    | i = INT { LInt i }
-    | d = DOUBLE {LDouble d}
-    | s = SYM { LSymbol s }
-    | s = STR { LString (String.uppercase_ascii s) }
-    | LPAREN; l = lisp_list_rest { l }
-    | QUOTE; e = expr { LQuoted e}
-    ;
+  | i = INT { LInt i }
+  | d = DOUBLE {LDouble d}
+  | s = SYM { LSymbol s }
+  | s = STR { LString (String.uppercase_ascii s) }
+  | LPAREN; l = lisp_list_rest { l }
+  | QUOTE; e = expr { LQuoted e}
+;
 
 lisp_list_rest:
-    | RPAREN { LNil }
-    | e = expr; lr = lisp_list_rest { LCons (e, lr) }
-    ;
+  | RPAREN { LNil }
+  | e = expr; lr = lisp_list_rest { LCons (e, lr) }
+;

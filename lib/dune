@@ -1,7 +1,5 @@
 (library
- (name lisp)
- ;(modules ast read lexer parser)
- )
+ (name lisp))
 
 (include_subdirs unqualified)
 
