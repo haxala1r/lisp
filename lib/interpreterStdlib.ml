@@ -1,6 +1,6 @@
 open Ast;;
 
-let iadd _ vs : lisp_val = 
+let iadd _ vs : lisp_val =
   let rec auxi vs accum = 
     match vs with
     | LCons (LInt a, b) -> (auxi b (accum + a))
@@ -12,7 +12,7 @@ let iadd _ vs : lisp_val =
     | LCons (LDouble a, b) -> (auxf b (accum +. a))
     | _ -> LDouble accum
   in (auxi vs 0);;
-let isub _ vs = 
+let isub _ vs =
   let rec auxi vs accum = 
     match vs with
     | LNil -> LInt accum
@@ -46,15 +46,27 @@ let cdr _ vs =
 
 
 (* This is the special built-in function that allows us to create
-a new function. 
+a new function.
 
 (bind-function 'sym '(a b) '(+ a b))
 *)
-let bind_function env vs =
-  let rais () = raise (Invalid_argument "not enough args to bind-function") in
-  match vs with
-  | LCons (LSymbol sym, LCons (ll, body)) ->
-    let f = (LFunction (sym, env_copy env, ll, body)) in
-    env_set_global env sym f;
+
+(* Binds any value to a symbol, in the *global environment*. *)
+let bind_symbol env =
+  function
+  (* Special case for setting a function to a symbol, if the function
+     is a lambda then we turn it into a real "function" by giving it this
+     new name *)
+  | LCons (LSymbol s, LCons (LLambda (e, l, b), LNil)) ->
+    let f = LFunction (s, e, l, b) in
+    env_set_global env s f;
     f
-  | _ -> rais ()
+  | LCons (LSymbol s, LCons (v, LNil)) ->
+    env_set_global env s v;
+    v
+  | _ -> raise (Invalid_argument "invalid args to set!")
+
+let lambda env = function
+  | LCons (l, body) ->
+    LLambda (env, l, body)
+  | _ -> raise (Invalid_argument "invalid args to lambda!")

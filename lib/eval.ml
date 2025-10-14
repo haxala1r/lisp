@@ -6,11 +6,14 @@ let default_env: environment = [Hashtbl.create 1024];;
 
 let add_builtin s f =
   env_set_global default_env s (LBuiltinFunction (s, f))
+let add_special s f =
+  env_set_global default_env s (LBuiltinSpecial (s, f))
 let () = add_builtin "+" iadd
 let () = add_builtin "-" isub
 let () = add_builtin "car" car
 let () = add_builtin "cdr" cdr
-let () = add_builtin "bind-function" bind_function
+let () = add_builtin "bind-symbol" bind_symbol 
+let () = add_special "lambda" lambda
 
 let make_env () = [Hashtbl.copy (List.hd default_env)]
 
@@ -58,6 +61,7 @@ and bind_args env = function
   | _ -> fun _ -> err "bind_args"
   
 and eval_apply args = function
+  | LLambda (e, l, b)
   | LFunction (_, e, l, b) ->
     let lexical_env = env_new_lexical e in
     bind_args lexical_env l args;
@@ -74,9 +78,11 @@ and eval_apply args = function
 
 and eval_call env func args =
   match func with
+  | LBuiltinSpecial (_, f) -> f env args
   | LBuiltinFunction (_, f) -> f env (eval_list env args)
   (* The function calls don't happen in the calling environment,
-  so it makes no sense to pass env to a call. *)
+     so it makes no sense to pass env to a call. *)
+  | LLambda _
   | LFunction _ -> eval_apply (eval_list env args) func
   (* Macros are the same, they just return code that *will* be evaluated
   in the calling environment *)

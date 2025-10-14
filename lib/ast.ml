@@ -11,8 +11,10 @@ type lisp_val =
   generally, builtin functions should handle their arguments directly,
   and eval forms in the environment as necessary. *)
   | LBuiltinFunction of string * (environment -> lisp_val -> lisp_val)
+  | LBuiltinSpecial of string * (environment -> lisp_val -> lisp_val)
   (* a function is a name, captured environment, a parameter list, and function body. *)
   | LFunction of string * environment * lisp_val * lisp_val
+  | LLambda of environment * lisp_val * lisp_val
   (* a macro is exactly the same as a function, with the distinction
   that it receives all of its arguments completely unevaluated
   in a compiled lisp this would probably make more of a difference *)
@@ -51,7 +53,10 @@ let rec dbg_print_one v =
   | LNil -> pf "()"
   | LCons (a, b) -> pf "(%s . %s)" (dbg_print_one a) (dbg_print_one b)
   | LDouble d -> pf "<double: %f>" d
+  | LBuiltinSpecial (name, _)
   | LBuiltinFunction (name, _) -> pf "<builtin: %s>" name
+  | LLambda (_, args, _) -> pf "<unnamed function, lambda-list: %s>"
+    (dbg_print_one args)
   | LFunction (name, _, args, _) -> pf "<function: '%s' lambda-list: %s>" 
     name (dbg_print_one args)
   | LMacro (name, _, args, _) -> pf "<function '%s' lambda-list: %s>"
