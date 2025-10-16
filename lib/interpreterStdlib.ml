@@ -47,13 +47,6 @@ let cons _ vs =
 
 let lisp_list _ vs = vs
 
-
-(* This is the special built-in function that allows us to create
-a new function.
-
-(bind-function 'sym '(a b) '(+ a b))
-*)
-
 (* Binds any value to a symbol, in the *global environment*. *)
 let bind_symbol env =
   function
