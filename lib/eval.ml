@@ -98,7 +98,16 @@ and (* This only creates a *local* binding, contained to the body given. *)
     env_set_local e s v;
     eval_body e body
   | _ -> invalid_arg "invalid argument to bind-local"
-
+and lisp_if env = function
+  | LCons (cond, LCons (if_true, LNil)) ->
+    (match eval_one env cond with
+     | LNil -> LNil
+     | _ -> eval_one env if_true)
+  | LCons (cond, LCons (if_true, LCons (if_false, LNil))) ->
+    (match eval_one env cond with
+     | LNil -> eval_one env if_false
+     | _ -> eval_one env if_true)
+  | _ -> invalid_arg "invalid argument list passed to if!"
 
 let eval_all env vs =
   let ev v = eval_one env v in
@@ -111,19 +120,25 @@ let () = add_builtin "cdr" cdr
 let () = add_builtin "cons" cons
 let () = add_builtin "bind-symbol" bind_symbol 
 let () = add_builtin "list" lisp_list
-let () = add_special "lambda" lambda
-let () = add_special "lambda-macro" lambda_macro
+let () = add_special "fn" lambda
+let () = add_special "fn-macro" lambda_macro
 let () = add_special "let-one" bind_local
 let () = add_special "quote" (fun _ -> function
     | LCons (x, LNil) -> x
                          | _ -> invalid_arg "hmm")
+let () = add_special "if" lisp_if
+(*let () = add_builtin "print" lisp_prin *)
 
 (* I know this looks insane. please trust me. *)
 let _ = eval_all default_env (Read.parse_str "
-(bind-symbol 'defun
-  (lambda-macro (name lm . body)
-    (list 'bind-symbol (list 'quote name) (cons 'lambda (cons lm body)))))
+(bind-symbol 'defn
+  (fn-macro (name lm . body)
+    (list 'bind-symbol (list 'quote name) (cons 'fn (cons lm body)))))
 (bind-symbol 'defmacro
-  (lambda-macro (name lm . body)
-    (list 'bind-symbol (list 'quote name) (cons 'lambda-macro (cons lm body)))))")
+  (fn-macro (name lm . body)
+    (list 'bind-symbol (list 'quote name) (cons 'fn-macro (cons lm body)))))
+(defmacro def
+  (var val)
+  (list 'bind-symbol (list 'quote var) val))
+()")
 
