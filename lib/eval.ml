@@ -113,8 +113,8 @@ let eval_all env vs =
   let ev v = eval_one env v in
   List.map ev vs
 
-let () = add_builtin "+" iadd
-let () = add_builtin "-" isub
+let () = add_builtin "+" add
+let () = add_builtin "-" sub
 let () = add_builtin "car" car
 let () = add_builtin "cdr" cdr
 let () = add_builtin "cons" cons

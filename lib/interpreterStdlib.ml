@@ -1,37 +1,33 @@
 open Ast;;
 
-let iadd _ vs : lisp_val =
-  let rec auxi vs accum = 
-    match vs with
-    | LCons (LInt a, b) -> (auxi b (accum + a))
-    | LCons (LDouble a, b) -> (auxf b ((float_of_int accum) +. a))
-    | _ -> LInt accum
-  and auxf vs accum =
-    match vs with
-    | LCons (LInt a, b) -> (auxf b (accum +. (float_of_int a)))
-    | LCons (LDouble a, b) -> (auxf b (accum +. a))
-    | _ -> LDouble accum
-  in (auxi vs 0);;
-let isub _ vs =
-  let rec auxi vs accum = 
-    match vs with
-    | LNil -> LInt accum
-    | LCons (LInt a, b) -> auxi b (accum - a)
-    | LCons (LDouble a, b) -> auxf b ((float_of_int accum) -. a)
-    | _ -> raise (Invalid_argument "-: invalid argument to subtraction operator")
-  and auxf vs accum = 
-    match vs with
-    | LNil -> LDouble accum
-    | LCons (LInt a, b) -> auxf b (accum -. (float_of_int a))
-    | LCons (LDouble a, b) -> auxf b (accum -. a)
-    | _ -> raise (Invalid_argument "-: invalid argument to subtraction operator")
-  in
-  match vs with
-  | LCons (LInt a, LNil) -> LInt (-a)
-  | LCons (LInt a, b) -> auxi b a
-  | LCons (LDouble a, LNil) -> LDouble (-. a)
-  | LCons (LDouble a, b) -> auxf b a
-  | _ -> auxi vs 0;;
+let add _ vs =
+  let rec aux accum = function
+    | LCons (a, b) ->
+      (match accum, a with
+       | LInt x , LInt y -> aux (LInt (x + y)) b
+       | LDouble x, LInt y -> aux (LDouble (x +. (float_of_int y))) b
+       | LInt x, LDouble y -> aux (LDouble ((float_of_int x) +. y)) b
+       | LDouble x, LDouble y -> aux (LDouble (x +. y)) b
+       | _ -> invalid_arg "invalid args to +")
+    | LNil -> accum
+    | _ -> invalid_arg "invalid args to +"
+  in aux (LInt 0) vs
+let sub _ vs =
+  let rec aux accum = function
+    | LNil -> accum
+    | LCons (a, b) -> (match accum, a, b with
+        | LNil, LDouble x, LNil -> LDouble (-. x)
+        | LNil, LInt x, LNil -> LInt (-x)
+        | LNil, LDouble _, _
+        | LNil, LInt _, _ -> aux a b
+        | LInt x, LInt y, _ -> aux (LInt (x - y)) b
+        | LInt x, LDouble y, _ -> aux (LDouble ((float_of_int x) -. y)) b
+        | LDouble x, LDouble y, _ -> aux (LDouble (x -. y)) b
+        | LDouble x, LInt y, _ -> aux (LDouble (x -. (float_of_int y))) b
+        | _ -> invalid_arg "invalid argument to -")
+    | _ -> invalid_arg "argument to -"
+  in aux LNil vs
+      
 
 
 let car _ vs =
