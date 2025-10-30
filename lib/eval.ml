@@ -91,13 +91,21 @@ and eval_call env func args =
                   (Printf.sprintf "eval_apply: cannot call non-function object %s" (dbg_print_one v)))
 
 and (* This only creates a *local* binding, contained to the body given. *)
-  bind_local env =
-  function
+  bind_local env = function
   | LCons (LSymbol s, LCons (v, body)) ->
     let e = env_new_lexical env in
     env_set_local e s v;
     eval_body e body
   | _ -> invalid_arg "invalid argument to bind-local"
+
+(* special form that creates a global binding *)
+and lisp_define env = function
+  | LCons (LSymbol s, LCons (v, LNil)) ->
+     let evaluated = eval_one env v in
+     env_set_global env s evaluated;
+     evaluated
+  | _ -> invalid_arg "invalid args to def"
+
 and lisp_if env = function
   | LCons (cond, LCons (if_true, LNil)) ->
     (match eval_one env cond with
@@ -118,7 +126,8 @@ let () = add_builtin "-" sub
 let () = add_builtin "car" car
 let () = add_builtin "cdr" cdr
 let () = add_builtin "cons" cons
-let () = add_builtin "bind-symbol" bind_symbol 
+let () = add_special "def" lisp_define
+let () = add_builtin "set" lisp_set
 let () = add_builtin "list" lisp_list
 let () = add_special "fn" lambda
 let () = add_special "fn-macro" lambda_macro
@@ -131,14 +140,11 @@ let () = add_special "if" lisp_if
 
 (* I know this looks insane. please trust me. *)
 let _ = eval_all default_env (Read.parse_str "
-(bind-symbol 'defn
+(def defn
   (fn-macro (name lm . body)
-    (list 'bind-symbol (list 'quote name) (cons 'fn (cons lm body)))))
-(bind-symbol 'defmacro
+    (list 'def name (cons 'fn (cons lm body)))))
+(def defmacro
   (fn-macro (name lm . body)
-    (list 'bind-symbol (list 'quote name) (cons 'fn-macro (cons lm body)))))
-(defmacro def
-  (var val)
-  (list 'bind-symbol (list 'quote var) val))
-()")
+    (list 'def name (cons 'fn-macro (cons lm body)))))
+")
 

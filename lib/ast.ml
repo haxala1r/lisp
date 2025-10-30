@@ -27,7 +27,15 @@ and environment = (string, lisp_val) Hashtbl.t list
 let env_set_local env s v =
   match env with
   | [] -> ()
-  | e1 :: _ ->  Hashtbl.replace e1 s v
+  | e1 :: _ -> Hashtbl.replace e1 s v
+
+let rec env_update env s v =
+  match env with
+  | [] -> ()
+  | e1 :: erest ->
+     match Hashtbl.find_opt e1 s with
+     | None -> env_update erest s v
+     | Some _ -> Hashtbl.replace e1 s v
 
 let env_new_lexical env = 
   let h = Hashtbl.create 16 in

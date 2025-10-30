@@ -47,23 +47,12 @@ let cons _ vs =
 
 let lisp_list _ vs = vs
 
-(* Binds any value to a symbol, in the *global environment*. *)
-let bind_symbol env =
-  function
-  (* Special case for setting a function to a symbol, if the function
-     is a lambda then we turn it into a real "function" by giving it this
-     new name *)
-  | LCons (LQuoted (LSymbol s), LCons (LLambda (e, l, b), LNil))
-  | LCons (LSymbol s, LCons (LLambda (e, l, b), LNil)) ->
-    let f = LFunction (s, e, l, b) in
-    env_set_global env s f;
-    f
-  | LCons (LQuoted (LSymbol s), LCons (v, LNil))
+(* builtin function that updates an existing binding *)
+let lisp_set env = function
   | LCons (LSymbol s, LCons (v, LNil)) ->
-    env_set_global env s v;
-    v
-  | _ -> raise (Invalid_argument "invalid args to set!")
-           
+     env_update env s v;
+     v
+  | _ -> invalid_arg "invalid args to set"
 
 let lambda env = function
   | LCons (l, body) ->
