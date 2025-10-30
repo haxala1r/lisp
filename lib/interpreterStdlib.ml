@@ -62,3 +62,8 @@ let lambda env = function
 let lambda_macro env = function
   | LCons (l, body) -> LUnnamedMacro (env, l, body)
   | _ -> invalid_arg "invalid args to lambda-macro"
+
+
+let lisp_not _ = function
+  | LCons (LNil, LNil) -> LSymbol "t"
+  | _ -> LNil

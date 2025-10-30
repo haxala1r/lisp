@@ -133,18 +133,37 @@ let () = add_special "fn" lambda
 let () = add_special "fn-macro" lambda_macro
 let () = add_special "let-one" bind_local
 let () = add_special "quote" (fun _ -> function
-    | LCons (x, LNil) -> x
-                         | _ -> invalid_arg "hmm")
+             | LCons (x, LNil) -> x
+             | _ -> invalid_arg "hmm")
 let () = add_special "if" lisp_if
+let () = add_builtin "nil?" lisp_not
+let () = add_builtin "not" lisp_not (* Yes, these are the same thing *)
 (*let () = add_builtin "print" lisp_prin *)
 
-(* I know this looks insane. please trust me. *)
-let _ = eval_all default_env (Read.parse_str "
+(* I know this looks insane. please trust me.
+   Idea: maybe put this in a file instead of putting
+   literally the entire standard library in a constant string
+ *)
+let _ = eval_all default_env (Read.parse_str
+"
 (def defn
   (fn-macro (name lm . body)
     (list 'def name (cons 'fn (cons lm body)))))
 (def defmacro
   (fn-macro (name lm . body)
     (list 'def name (cons 'fn-macro (cons lm body)))))
+
+(defmacro setq (sym val)
+ (list 'set (list 'quote sym) val))
+(defmacro letfn (sym fun . body)
+ (cons 'let-one (cons sym (cons '() (cons (list 'setq sym fun) body)))))
+
+
+(defn filter (f l)
+   (letfn helper
+       (fn (l acc)
+         (if (nil? l) acc (helper (cdr l) (if (f (car l)) (cons (car l) acc) acc))))
+     (helper l '())))
+ 
 ")
 
