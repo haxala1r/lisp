@@ -1,17 +1,16 @@
 open Ast
 (* the type `environment` is defined in Ast *)
 
-
-let new_lexical env = 
+let new_lexical (env : environment) : environment = 
   let h = Hashtbl.create 16 in
   h :: env
 
-let set_local env s v =
+let set_local (env : environment) (s : string) (v : lisp_val) : unit =
   match env with
   | [] -> ()
   | e1 :: _ -> Hashtbl.replace e1 s v
 
-let rec update env s v =
+let rec update (env : environment) s v =
   match env with
   | [] -> ()
   | e1 :: erest ->
@@ -25,10 +24,10 @@ let rec get_root (env : environment) =
   | e :: [] -> e
   | _ :: t -> get_root t
 
-let set_global env s v =
+let set_global (env : environment) s v =
   Hashtbl.replace (get_root env) s v
 
-let copy env =
+let copy (env : environment) : environment =
   List.map Hashtbl.copy env
 
 

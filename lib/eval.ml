@@ -43,35 +43,26 @@ and eval_body env body =
   | LCons (form, next) -> ignore (eval_one env form); eval_body env next
   | _ -> LNil
 
-and err s = raise (Invalid_argument s)
 and bind_args env = function
-  | LNil -> (function
-      | LNil -> ()
-      | _ -> err "cannot bind arguments")
-  | LSymbol s ->
-    (function
-      | v -> Env.set_local env s v; ())
-  | LCons (LSymbol hl, tl) -> (function
-      | LCons (ha, ta) -> 
-        Env.set_local env hl ha;
-        bind_args env tl ta;
-      | _ -> err "cannot bind arguments")
-  | _ -> fun _ -> err "bind_args"
-  
+  | (LNil, LNil) -> ()
+  | (LSymbol s, v) -> Env.set_local env s v
+  | (LCons (LSymbol hl, tl), LCons (ha, ta)) -> Env.set_local env hl ha; bind_args env (tl, ta)
+  | _ -> invalid_arg "cannot bind argument list for function"
+
 and eval_apply args = function
   | LLambda (e, l, b)
   | LFunction (_, e, l, b) ->
     let lexical_env = Env.new_lexical e in
-    bind_args lexical_env l args;
+    bind_args lexical_env (l, args);
     eval_body lexical_env b
   | LUnnamedMacro (e, l, b)
   | LMacro (_, e, l, b) ->
     let lexical_env = Env.new_lexical e in
-    bind_args lexical_env l args;
+    bind_args lexical_env (l, args);
     eval_body lexical_env b
   | v ->
-    err ("Non-macro non-function value passed to eval_apply "
-        ^ dbg_print_one v); LNil
+    invalid_arg ("Non-macro non-function value passed to eval_apply "
+        ^ dbg_print_one v)
     
 
 
@@ -90,8 +81,8 @@ and eval_call env func args =
   | v -> raise (Invalid_argument 
                   (Printf.sprintf "eval_apply: cannot call non-function object %s" (dbg_print_one v)))
 
-and (* This only creates a *local* binding, contained to the body given. *)
-  bind_local env = function
+ (* This only creates a *local* binding, contained to the body given. *)
+let bind_local env = function
   | LCons (LSymbol s, LCons (v, body)) ->
     let e = Env.new_lexical env in
     Env.set_local e s v;
@@ -99,14 +90,14 @@ and (* This only creates a *local* binding, contained to the body given. *)
   | _ -> invalid_arg "invalid argument to bind-local"
 
 (* special form that creates a global binding *)
-and lisp_define env = function
+let lisp_define env = function
   | LCons (LSymbol s, LCons (v, LNil)) ->
      let evaluated = eval_one env v in
      Env.set_global env s evaluated;
      evaluated
   | _ -> invalid_arg "invalid args to def"
 
-and lisp_if env = function
+let lisp_if env = function
   | LCons (cond, LCons (if_true, LNil)) ->
     (match eval_one env cond with
      | LNil -> LNil
