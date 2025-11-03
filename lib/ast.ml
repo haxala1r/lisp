@@ -21,37 +21,10 @@ type lisp_val =
   | LMacro of string * environment * lisp_val * lisp_val
   | LUnnamedMacro of environment * lisp_val * lisp_val
   | LQuoted of lisp_val
+(* the environment type needs to be defined here, as it is mutually
+ recursive with lisp_val *)
 and environment = (string, lisp_val) Hashtbl.t list
 
-
-let env_set_local env s v =
-  match env with
-  | [] -> ()
-  | e1 :: _ -> Hashtbl.replace e1 s v
-
-let rec env_update env s v =
-  match env with
-  | [] -> ()
-  | e1 :: erest ->
-     match Hashtbl.find_opt e1 s with
-     | None -> env_update erest s v
-     | Some _ -> Hashtbl.replace e1 s v
-
-let env_new_lexical env = 
-  let h = Hashtbl.create 16 in
-  h :: env
-
-let rec env_root (env : environment) =
-  match env with
-  | [] -> raise (Invalid_argument "Empty environment passed to env_root!")
-  | e :: [] -> e
-  | _ :: t -> env_root t
-
-let env_set_global env s v =
-  Hashtbl.replace (env_root env) s v
-
-let env_copy env =
-  List.map Hashtbl.copy env
 
 let rec dbg_print_one v =
   let pf = Printf.sprintf in

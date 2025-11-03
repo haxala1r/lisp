@@ -50,7 +50,7 @@ let lisp_list _ vs = vs
 (* builtin function that updates an existing binding *)
 let lisp_set env = function
   | LCons (LSymbol s, LCons (v, LNil)) ->
-     env_update env s v;
+     Env.update env s v;
      v
   | _ -> invalid_arg "invalid args to set"
 

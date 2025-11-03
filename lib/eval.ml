@@ -5,11 +5,11 @@ open InterpreterStdlib;;
 let default_env: environment = [Hashtbl.create 1024];;
 
 let add_builtin s f =
-  env_set_global default_env s (LBuiltinFunction (s, f))
+  Env.set_global default_env s (LBuiltinFunction (s, f))
 let add_special s f =
-  env_set_global default_env s (LBuiltinSpecial (s, f))
+  Env.set_global default_env s (LBuiltinSpecial (s, f))
 
-let make_env () = [Hashtbl.copy (List.hd default_env)]
+let make_env () = Env.copy default_env
 
 (* the type annotations are unnecessary, but help constrain us from a
 potentially more general function here *)
@@ -50,10 +50,10 @@ and bind_args env = function
       | _ -> err "cannot bind arguments")
   | LSymbol s ->
     (function
-      | v -> env_set_local env s v; ())
+      | v -> Env.set_local env s v; ())
   | LCons (LSymbol hl, tl) -> (function
       | LCons (ha, ta) -> 
-        env_set_local env hl ha;
+        Env.set_local env hl ha;
         bind_args env tl ta;
       | _ -> err "cannot bind arguments")
   | _ -> fun _ -> err "bind_args"
@@ -61,12 +61,12 @@ and bind_args env = function
 and eval_apply args = function
   | LLambda (e, l, b)
   | LFunction (_, e, l, b) ->
-    let lexical_env = env_new_lexical e in
+    let lexical_env = Env.new_lexical e in
     bind_args lexical_env l args;
     eval_body lexical_env b
   | LUnnamedMacro (e, l, b)
   | LMacro (_, e, l, b) ->
-    let lexical_env = env_new_lexical e in
+    let lexical_env = Env.new_lexical e in
     bind_args lexical_env l args;
     eval_body lexical_env b
   | v ->
@@ -93,8 +93,8 @@ and eval_call env func args =
 and (* This only creates a *local* binding, contained to the body given. *)
   bind_local env = function
   | LCons (LSymbol s, LCons (v, body)) ->
-    let e = env_new_lexical env in
-    env_set_local e s v;
+    let e = Env.new_lexical env in
+    Env.set_local e s v;
     eval_body e body
   | _ -> invalid_arg "invalid argument to bind-local"
 
@@ -102,7 +102,7 @@ and (* This only creates a *local* binding, contained to the body given. *)
 and lisp_define env = function
   | LCons (LSymbol s, LCons (v, LNil)) ->
      let evaluated = eval_one env v in
-     env_set_global env s evaluated;
+     Env.set_global env s evaluated;
      evaluated
   | _ -> invalid_arg "invalid args to def"
 
