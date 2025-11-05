@@ -1,8 +1,11 @@
 open Lisp.Ast;;
 open Printf;;
 open Lisp;;
+open Env;;
 open Eval;;
 open Read;;
+
+let () = InterpreterStdlib.init_default_env ()
 
 let rec repl env c =
   let () = printf ">>> "; Out_channel.flush Out_channel.stdout; in

@@ -1,6 +1,13 @@
 open Ast
 (* the type `environment` is defined in Ast *)
 
+let default_env: environment = [Hashtbl.create 1024];;
+
+let copy (env : environment) : environment =
+  List.map Hashtbl.copy env
+
+let make_env () = copy default_env
+
 let new_lexical (env : environment) : environment = 
   let h = Hashtbl.create 16 in
   h :: env
@@ -27,7 +34,7 @@ let rec get_root (env : environment) =
 let set_global (env : environment) s v =
   Hashtbl.replace (get_root env) s v
 
-let copy (env : environment) : environment =
-  List.map Hashtbl.copy env
-
-
+let add_builtin s f =
+  set_global default_env s (LBuiltinFunction (s, f))
+let add_special s f =
+  set_global default_env s (LBuiltinSpecial (s, f))

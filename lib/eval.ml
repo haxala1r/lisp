@@ -1,15 +1,5 @@
 open Ast;;
-open InterpreterStdlib;;
 
-
-let default_env: environment = [Hashtbl.create 1024];;
-
-let add_builtin s f =
-  Env.set_global default_env s (LBuiltinFunction (s, f))
-let add_special s f =
-  Env.set_global default_env s (LBuiltinSpecial (s, f))
-
-let make_env () = Env.copy default_env
 
 (* the type annotations are unnecessary, but help constrain us from a
 potentially more general function here *)
@@ -63,8 +53,6 @@ and eval_apply args = function
   | v ->
     invalid_arg ("Non-macro non-function value passed to eval_apply "
         ^ dbg_print_one v)
-    
-
 
 and eval_call env func args =
   match func with
@@ -81,80 +69,8 @@ and eval_call env func args =
   | v -> raise (Invalid_argument 
                   (Printf.sprintf "eval_apply: cannot call non-function object %s" (dbg_print_one v)))
 
- (* This only creates a *local* binding, contained to the body given. *)
-let bind_local env = function
-  | LCons (LSymbol s, LCons (v, body)) ->
-    let e = Env.new_lexical env in
-    Env.set_local e s v;
-    eval_body e body
-  | _ -> invalid_arg "invalid argument to bind-local"
-
-(* special form that creates a global binding *)
-let lisp_define env = function
-  | LCons (LSymbol s, LCons (v, LNil)) ->
-     let evaluated = eval_one env v in
-     Env.set_global env s evaluated;
-     evaluated
-  | _ -> invalid_arg "invalid args to def"
-
-let lisp_if env = function
-  | LCons (cond, LCons (if_true, LNil)) ->
-    (match eval_one env cond with
-     | LNil -> LNil
-     | _ -> eval_one env if_true)
-  | LCons (cond, LCons (if_true, LCons (if_false, LNil))) ->
-    (match eval_one env cond with
-     | LNil -> eval_one env if_false
-     | _ -> eval_one env if_true)
-  | _ -> invalid_arg "invalid argument list passed to if!"
-
 let eval_all env vs =
   let ev v = eval_one env v in
-  List.map ev vs
+  List.map ev vs;;
 
-let () = add_builtin "+" add
-let () = add_builtin "-" sub
-let () = add_builtin "car" car
-let () = add_builtin "cdr" cdr
-let () = add_builtin "cons" cons
-let () = add_special "def" lisp_define
-let () = add_builtin "set" lisp_set
-let () = add_builtin "list" lisp_list
-let () = add_special "fn" lambda
-let () = add_special "fn-macro" lambda_macro
-let () = add_special "let-one" bind_local
-let () = add_special "quote" (fun _ -> function
-             | LCons (x, LNil) -> x
-             | _ -> invalid_arg "hmm")
-let () = add_special "if" lisp_if
-let () = add_builtin "nil?" lisp_not
-let () = add_builtin "not" lisp_not (* Yes, these are the same thing *)
-(*let () = add_builtin "print" lisp_prin *)
-
-(* I know this looks insane. please trust me.
-   Idea: maybe put this in a file instead of putting
-   literally the entire standard library in a constant string
- *)
-let _ = eval_all default_env (Read.parse_str
-"
-(def defn
-  (fn-macro (name lm . body)
-    (list 'def name (cons 'fn (cons lm body)))))
-(def defmacro
-  (fn-macro (name lm . body)
-    (list 'def name (cons 'fn-macro (cons lm body)))))
-
-(defmacro setq (sym val)
- (list 'set (list 'quote sym) val))
-(defmacro letfn (sym fun . body)
- (cons 'let-one (cons sym (cons '() (cons (list 'setq sym fun) body)))))
-
-
-(defn filter (f l)
-   (letfn helper
-       (fn (l acc)
-         (if (nil? l) acc (helper (cdr l) (if (f (car l)) (cons (car l) acc) acc))))
-     (helper l '())))
- 
-")
 
