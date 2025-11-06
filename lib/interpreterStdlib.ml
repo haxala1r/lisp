@@ -1,33 +1,52 @@
 open Ast;;
 
+(* I feel like the more I get into functional programming, the more insane my code
+   becomes. What the fuck is this? why do I have a set of functions that combine
+   binary operators over an arbitrarily long list? I have like. 4 operators. None
+   of this matters.
+
+   But it's just so... beautiful.
+ *)
+let mathop_do_once int_op float_op = function
+  | (LDouble v1, LDouble v2) -> LDouble (float_op v1 v2)
+  | (LDouble v1, LInt v2) -> LDouble (float_op v1 (float_of_int v2))
+  | (LInt v1, LDouble v2) -> LDouble (float_op (float_of_int v1) v2)
+  | (LInt v1, LInt v2) -> LInt (int_op v1 v2)
+  | _ -> invalid_arg "invalid arguments to mathematical operator"
+
+let mathop_do_once_curried int_op float_op =
+  let f = mathop_do_once int_op float_op in
+  fun x -> fun y -> f (x, y)
+
+let mathop_reduce fi ff init vs =
+  let curried = mathop_do_once_curried fi ff in
+  reduce init curried vs
+
+let cast_int_to_double = function
+  | LInt x -> LDouble (float x)
+  | LDouble x -> LDouble x
+  | _ -> invalid_arg "can't cast_int_to_double!"
+
 let add _ vs =
-  let rec aux accum = function
-    | LCons (a, b) ->
-      (match accum, a with
-       | LInt x , LInt y -> aux (LInt (x + y)) b
-       | LDouble x, LInt y -> aux (LDouble (x +. (float_of_int y))) b
-       | LInt x, LDouble y -> aux (LDouble ((float_of_int x) +. y)) b
-       | LDouble x, LDouble y -> aux (LDouble (x +. y)) b
-       | _ -> invalid_arg "invalid args to +")
-    | LNil -> accum
-    | _ -> invalid_arg "invalid args to +"
-  in aux (LInt 0) vs
-let sub _ vs =
-  let rec aux accum = function
-    | LNil -> accum
-    | LCons (a, b) -> (match accum, a, b with
-        | LNil, LDouble x, LNil -> LDouble (-. x)
-        | LNil, LInt x, LNil -> LInt (-x)
-        | LNil, LDouble _, _
-        | LNil, LInt _, _ -> aux a b
-        | LInt x, LInt y, _ -> aux (LInt (x - y)) b
-        | LInt x, LDouble y, _ -> aux (LDouble ((float_of_int x) -. y)) b
-        | LDouble x, LDouble y, _ -> aux (LDouble (x -. y)) b
-        | LDouble x, LInt y, _ -> aux (LDouble (x -. (float_of_int y))) b
-        | _ -> invalid_arg "invalid argument to -")
-    | _ -> invalid_arg "argument to -"
-  in aux LNil vs
-      
+  mathop_reduce (+) (+.) (LInt 0) vs
+let sub _ = function
+  | LCons (x, LNil) -> ((mathop_do_once (-) (-.)) (LInt 0, x))
+  | LCons (x, rest) -> mathop_reduce (-) (-.) x rest
+  | _ -> invalid_arg "invalid argument list passed to (-)"
+let mul _ vs =
+  mathop_reduce ( * ) ( *. ) (LInt 1) vs
+let div _ vs =
+  let div_one = mathop_do_once ( / ) ( /. ) in
+  match vs with
+    (* (/ x) is equal to 1 / x  *)
+  | LCons (x, LNil) -> div_one (LDouble 1., cast_int_to_double x)
+  | LCons (x, LCons (y, LNil)) -> div_one (cast_int_to_double x, y)
+  | _ -> invalid_arg "invalid argument list passed to (/)"
+
+let rem _ = function
+  | LCons (x, LCons (y, LNil)) ->
+     mathop_do_once (mod) (mod_float) (cast_int_to_double x, cast_int_to_double y)
+  | _ -> invalid_arg "invalid argument list passed to (rem)"
 
 
 let car _ vs =
@@ -123,8 +142,11 @@ let init_script = "
 let init_default_env () =
   add_builtin "+" add;
   add_builtin "-" sub;
+  add_builtin "*" mul;
+  add_builtin "/" div;
   add_builtin "car" car;
   add_builtin "cdr" cdr;
+  add_builtin "rem" rem;
   add_builtin "cons" cons;
   add_special "def" lisp_define;
   add_builtin "set" lisp_set;
