@@ -60,8 +60,6 @@ let reduce init f =
     | _ -> invalid_arg "cannot reduce over non-list!"
   in aux init
 
-
-
 let rec dbg_print_one v =
   let pf = Printf.sprintf in
   match v with
