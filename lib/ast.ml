@@ -60,14 +60,21 @@ let reduce init f =
     | _ -> invalid_arg "cannot reduce over non-list!"
   in aux init
 
-let rec dbg_print_one v =
+let rec dbg_print_list =
+  let pf = Printf.sprintf in
+  function
+  | LCons (v, LNil) -> pf "%s" (dbg_print_one v)
+  | LCons (v, rest) -> (pf "%s " (dbg_print_one v)) ^ (dbg_print_list rest)
+  | v -> pf ". %s" (dbg_print_one v)
+
+and dbg_print_one v =
   let pf = Printf.sprintf in
   match v with
   | LInt x ->  pf "<int: %d>" x
   | LSymbol s -> pf "<symbol: '%s'>" s
   | LString s -> pf "<string: '%s'>" s
   | LNil -> pf "()"
-  | LCons (a, b) -> pf "(%s . %s)" (dbg_print_one a) (dbg_print_one b)
+  | LCons _ -> pf "<list: (%s)>" (dbg_print_list v) 
   | LDouble d -> pf "<double: %f>" d
   | LBuiltinSpecial (name, _)
   | LBuiltinFunction (name, _) -> pf "<builtin: %s>" name
