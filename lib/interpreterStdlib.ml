@@ -49,21 +49,13 @@ let rem _ = function
   | _ -> invalid_arg "invalid argument list passed to (rem)"
 
 
-let car _ vs =
-  match vs with
-  | LCons (LCons (a, _), LNil) -> a
-  | _ -> raise (Invalid_argument "car: invalid argument")
-
-let cdr _ vs =
-  match vs with
-  | LCons (LCons (_, b), LNil) -> b
-  | _ -> raise (Invalid_argument "cdr: invalid argument")
-
-let cons _ vs =
-  match vs with
-  | LCons (a, LCons (b, LNil)) -> LCons (a, b)
-  | _ -> invalid_arg "invalid args to cons!"
-
+let car _ = function
+  | LCons (a, _) -> a
+  | _ -> invalid_arg "car: non-cons"
+let cdr _ = function
+  | LCons (_, d) -> d
+  | _ -> invalid_arg "cdr: non-cons"
+let cons _ a b = LCons (a, b)
 let lisp_list _ vs = vs
 
 (* builtin function that updates an existing binding *)
@@ -118,6 +110,36 @@ let lisp_if env = function
 
 open Env;;
 
+
+let bf s f = s, LBuiltinFunction (s, f)
+let bf1 s f =
+  let aux e = function
+    | LCons (v, LNil) -> f e v
+    | _ -> invalid_arg ("invalid argument to " ^ s)
+  in bf s aux
+let bf2 s f =
+  let aux e = function
+    | LCons (v1, LCons (v2, LNil)) -> f e v1 v2
+    | _ -> invalid_arg ("invalid argument to " ^ s)
+  in bf s aux
+
+let sp s f = s, LBuiltinSpecial (s, f)
+let sp1 s f =
+  let aux e = function
+    | LCons (v, LNil) -> f e v
+    | _ -> invalid_arg ("invalid argument to " ^ s)
+  in sp s aux
+let sp2 s f =
+  let aux e = function
+    | LCons (v1, LCons (v2, LNil)) -> f e v1 v2
+    | _ -> invalid_arg ("invalid argument to " ^ s)
+  in sp s aux
+ 
+
+let add_builtins bs =
+  List.iter (fun (s, f) -> set_default s f) bs
+
+
 let init_script = "
 (def defn
   (fn-macro (name lm . body)
@@ -140,6 +162,7 @@ let init_script = "
 ";;
 
 let init_default_env () =
+  (*
   add_builtin "+" add;
   add_builtin "-" sub;
   add_builtin "*" mul;
@@ -159,7 +182,26 @@ let init_default_env () =
       | _ -> invalid_arg "hmm");
   add_special "if" lisp_if;
   add_builtin "nil?" lisp_not;
-  add_builtin "not" lisp_not; (* Yes, these are the same thing *)
+  add_builtin "not" lisp_not; (* Yes, these are the same thing *) *)
+  add_builtins [
+      bf "+" add; bf "-" sub;
+      bf "*" mul; bf "/" div;
+      bf1 "car" car;
+      bf1 "cdr" cdr;
+      bf2 "cons" cons;
+      bf "rem" rem;
+      bf "set" lisp_set;
+      bf "list" lisp_list;
+      bf "nil?" lisp_not;
+      bf "not" lisp_not;
+      
+      sp "fn" lambda;
+      sp "fn-macro" lambda_macro;
+      sp "let-one" bind_local;
+      sp "def" lisp_define;
+      sp1 "quote" (fun _ x -> x);
+      sp "if" lisp_if;
+    ];
 
   (*let () = add_builtin "print" lisp_prin *)
 

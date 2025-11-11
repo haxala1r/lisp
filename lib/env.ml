@@ -34,7 +34,5 @@ let rec get_root (env : environment) =
 let set_global (env : environment) s v =
   Hashtbl.replace (get_root env) s v
 
-let add_builtin s f =
-  set_global default_env s (LBuiltinFunction (s, f))
-let add_special s f =
-  set_global default_env s (LBuiltinSpecial (s, f))
+let set_default s v =
+  set_global default_env s v
