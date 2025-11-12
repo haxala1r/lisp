@@ -73,7 +73,7 @@ and dbg_print_one v =
   | LInt x ->  pf "<int: %d>" x
   | LSymbol s -> pf "<symbol: '%s'>" s
   | LString s -> pf "<string: '%s'>" s
-  | LNil -> pf "()"
+  | LNil -> pf "<nil>"
   | LCons _ -> pf "<list: (%s)>" (dbg_print_list v) 
   | LDouble d -> pf "<double: %f>" d
   | LBuiltinSpecial (name, _)
@@ -88,6 +88,27 @@ and dbg_print_one v =
     name (dbg_print_one args)
   | LQuoted v -> pf "<quote: %s>" (dbg_print_one v)
   (*| _ -> "<Something else>"*)
+
+let rec pretty_print_one v =
+  let pf = Printf.sprintf in
+  match v with
+  | LInt x -> pf "%d" x
+  | LSymbol s -> pf "%s" s
+  | LString s -> pf "\"%s\"" s
+  | LNil -> pf "()"
+  | LCons (a, b) -> pf "(%s)" (dbg_print_list (LCons (a,b)))
+  | LDouble d -> pf "%f" d
+  | LQuoted v -> pf "'%s" (pretty_print_one v)
+  | LBuiltinSpecial _
+  | LBuiltinFunction _ 
+  | LLambda _
+  | LFunction _
+  | LUnnamedMacro _
+  | LMacro _  -> dbg_print_one v
+
+let pretty_print_all vs =
+  let pr v = Printf.printf "%s\n" (pretty_print_one v) in
+  List.iter pr vs
 
 let dbg_print_all vs =
   let pr v = Printf.printf "%s\n" (dbg_print_one v) in

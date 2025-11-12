@@ -59,20 +59,28 @@ let cons _ a b = LCons (a, b)
 let lisp_list _ vs = vs
 
 (* builtin function that updates an existing binding *)
-let lisp_set env = function
-  | LCons (LSymbol s, LCons (v, LNil)) ->
-     Env.update env s v;
-     v
-  | _ -> invalid_arg "invalid args to set"
-
+let lisp_set env sym v =
+  match sym with
+  | LSymbol s -> Env.update env s v; v
+  | _ -> invalid_arg ("cannot set non-symbol " ^ dbg_print_one sym)
 let lambda env = function
   | LCons (l, body) ->
     LLambda (env, l, body)
-  | _ -> raise (Invalid_argument "invalid args to lambda!")
+  | args -> invalid_arg ("invalid args to fn! " ^ (dbg_print_one args)) 
+let defn env = function
+  | LCons (LSymbol s, LCons (l, body)) ->
+     let f = LFunction (s, env, l, body) in
+     Env.set_global env s f; f
+  | args -> invalid_arg ("cannot define function! " ^ (dbg_print_one args))
 
 let lambda_macro env = function
   | LCons (l, body) -> LUnnamedMacro (env, l, body)
-  | _ -> invalid_arg "invalid args to lambda-macro";;
+  | args -> invalid_arg ("invalid args to fn-macro! " ^ (dbg_print_one args)) 
+let defmacro env = function
+  | LCons (LSymbol s, LCons (l, body)) ->
+     let f = LMacro (s, env, l, body) in
+     Env.set_global env s f; f
+  | args -> invalid_arg ("cannot define macro! " ^ (dbg_print_one args))
 
 
 let lisp_not _ = function
@@ -83,7 +91,7 @@ let lisp_not _ = function
 let bind_local env = function
   | LCons (LSymbol s, LCons (v, body)) ->
     let e = Env.new_lexical env in
-    Env.set_local e s v;
+    Env.set_local e s (Eval.eval_one env v);
     Eval.eval_body e body
   | _ -> invalid_arg "invalid argument to bind-local"
 
@@ -105,7 +113,6 @@ let lisp_if env = function
      | LNil -> Eval.eval_one env if_false
      | _ -> Eval.eval_one env if_true)
   | _ -> invalid_arg "invalid argument list passed to if!"
-
 
 
 open Env;;
@@ -139,21 +146,24 @@ let sp2 s f =
 let add_builtins bs =
   List.iter (fun (s, f) -> set_default s f) bs
 
-
-let init_script = "
+(*
 (def defn
   (fn-macro (name lm . body)
     (list 'def name (cons 'fn (cons lm body)))))
 (def defmacro
   (fn-macro (name lm . body)
     (list 'def name (cons 'fn-macro (cons lm body)))))
+ *)
 
+let init_script =
+"
 (defmacro setq (sym val)
  (list 'set (list 'quote sym) val))
 (defmacro letfn (sym fun . body)
  (cons 'let-one (cons sym (cons '() (cons (list 'setq sym fun) body)))))
 
-
+(defn mapcar (f l)
+ (if l))
 (defn filter (f l)
    (letfn helper
        (fn (l acc)
@@ -162,27 +172,6 @@ let init_script = "
 ";;
 
 let init_default_env () =
-  (*
-  add_builtin "+" add;
-  add_builtin "-" sub;
-  add_builtin "*" mul;
-  add_builtin "/" div;
-  add_builtin "car" car;
-  add_builtin "cdr" cdr;
-  add_builtin "rem" rem;
-  add_builtin "cons" cons;
-  add_special "def" lisp_define;
-  add_builtin "set" lisp_set;
-  add_builtin "list" lisp_list;
-  add_special "fn" lambda;
-  add_special "fn-macro" lambda_macro;
-  add_special "let-one" bind_local;
-  add_special "quote" (fun _ -> function
-      | LCons (x, LNil) -> x
-      | _ -> invalid_arg "hmm");
-  add_special "if" lisp_if;
-  add_builtin "nil?" lisp_not;
-  add_builtin "not" lisp_not; (* Yes, these are the same thing *) *)
   add_builtins [
       bf "+" add; bf "-" sub;
       bf "*" mul; bf "/" div;
@@ -190,13 +179,15 @@ let init_default_env () =
       bf1 "cdr" cdr;
       bf2 "cons" cons;
       bf "rem" rem;
-      bf "set" lisp_set;
+      bf2 "set" lisp_set;
       bf "list" lisp_list;
       bf "nil?" lisp_not;
       bf "not" lisp_not;
       
       sp "fn" lambda;
+      sp "defn" defn;
       sp "fn-macro" lambda_macro;
+      sp "defmacro" defmacro;
       sp "let-one" bind_local;
       sp "def" lisp_define;
       sp1 "quote" (fun _ x -> x);

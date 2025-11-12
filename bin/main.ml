@@ -16,7 +16,7 @@ let rec repl env c =
     try
       let vals = (parse_str l) in
       (* dbg_print_all vals; *)
-      dbg_print_all (eval_all env vals);
+      pretty_print_all (eval_all env vals);
       Out_channel.flush Out_channel.stdout;
       repl env c
     with
