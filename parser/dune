@@ -1,0 +1,8 @@
+(library
+ (name parser)
+ (public_name parser)
+ (modules parser lex parse ast)
+ )
+
+(menhir (modules parse))
+(ocamllex lex)

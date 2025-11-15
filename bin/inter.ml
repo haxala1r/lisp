@@ -1,11 +1,10 @@
-open Lisp.Ast;;
+open Interpreter.Ast;;
 open Printf;;
-open Lisp;;
+open Interpreter;;
 open Env;;
 open Eval;;
-open Read;;
 
-let () = InterpreterStdlib.init_default_env ()
+let () = Stdlib.init_default_env ()
 
 let rec repl env c =
   let () = printf ">>> "; Out_channel.flush Out_channel.stdout; in
@@ -14,7 +13,7 @@ let rec repl env c =
   | Some "exit" -> ()
   | Some l ->
     try
-      let vals = (parse_str l) in
+      let vals = (read_from_str l) in
       (* dbg_print_all vals; *)
       pretty_print_all (eval_all env vals);
       Out_channel.flush Out_channel.stdout;
@@ -23,7 +22,7 @@ let rec repl env c =
     | Invalid_argument s ->
       printf "%s\nResuming repl\n" s;
       repl env c
-    | Parser.Error ->
+    | Parser.Parse.Error ->
       printf "Expression '%s' couldn't be parsed, try again\n" l;
       repl env c
 ;;

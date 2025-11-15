@@ -200,5 +200,5 @@ let init_default_env () =
      Idea: maybe put this in a file instead of putting
      literally the entire standard library in a constant string
    *)
-  ignore (Eval.eval_all default_env (Read.parse_str init_script));
+  ignore (Eval.eval_all default_env (read_from_str init_script));
   ()

@@ -12,7 +12,7 @@
 %token DOT
 %token EOF
 
-%start <Ast.lisp_val option> prog
+%start <lisp_ast option> prog
 %%
 
 prog:
@@ -22,7 +22,7 @@ prog:
 
 expr:
   | i = INT { LInt i }
-  | d = DOUBLE {LDouble d}
+  | d = DOUBLE { LDouble d}
   | s = SYM { LSymbol s }
   | s = STR { LString (String.uppercase_ascii s) }
   | LPAREN; l = lisp_list_rest { l }

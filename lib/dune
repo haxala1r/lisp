@@ -1,7 +1,0 @@
-(library
- (name lisp))
-
-(include_subdirs unqualified)
-
-(menhir (modules parser))
-(ocamllex lexer)

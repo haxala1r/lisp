@@ -1,6 +1,6 @@
 {
 open Lexing
-open Parser
+open Parse
 exception SyntaxError of string
 
 let strip_quotes s = String.sub s 1 (String.length s - 2);;

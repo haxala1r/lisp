@@ -1,3 +1,17 @@
+
+(* This is different from the lisp_ast data returned by the parser!
+   We will first need to translate that into this in order to use it.
+   This representation includes things that can only occur during runtime,
+   like the various kinds of functions and macros.
+
+   Additionally, since this is an interpreter, macros tend to be a little
+   awkward in that they behave exactly like the macro gets expanded just
+   before the result gets executed. This is different from the compiled
+   behaviour where the macro is evaluated at compile time.
+
+   Though of course, with the dynamic nature of lisp, and its capability
+   to compile more code at runtime, there will naturally be complications.
+ *)
 type lisp_val = 
   | LInt of int 
   | LDouble of float 
@@ -16,8 +30,8 @@ type lisp_val =
   | LFunction of string * environment * lisp_val * lisp_val
   | LLambda of environment * lisp_val * lisp_val
   (* a macro is exactly the same as a function, with the distinction
-  that it receives all of its arguments completely unevaluated
-  in a compiled lisp this would probably make more of a difference *)
+     that it receives all of its arguments completely unevaluated
+   *)
   | LMacro of string * environment * lisp_val * lisp_val
   | LUnnamedMacro of environment * lisp_val * lisp_val
   | LQuoted of lisp_val
@@ -113,3 +127,16 @@ let pretty_print_all vs =
 let dbg_print_all vs =
   let pr v = Printf.printf "%s\n" (dbg_print_one v) in
   List.iter pr vs
+
+
+let rec convert_one = function
+  | Parser.Ast.LInt x -> LInt x
+  | Parser.Ast.LDouble x -> LDouble x
+  | Parser.Ast.LNil -> LNil
+  | Parser.Ast.LString s -> LString s
+  | Parser.Ast.LSymbol s -> LSymbol s
+  | Parser.Ast.LCons (a, b) -> LCons (convert_one a, convert_one b)
+
+
+let read_from_str s =
+  List.map convert_one (Parser.parse_str s)

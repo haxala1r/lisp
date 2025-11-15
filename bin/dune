@@ -1,6 +1,5 @@
 (executable
- (name main)
- (public_name main)
- (libraries str lisp unix))
-(include_subdirs unqualified)
-
+ (name        inter)
+ (public_name inter)
+ (libraries str interpreter unix)
+ (package main))
