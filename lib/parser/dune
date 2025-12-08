@@ -1,0 +1,7 @@
+(library
+ (name parser)
+ (modules parser lex parse ast)
+ (package ollisp))
+
+(menhir (modules parse))
+(ocamllex lex)

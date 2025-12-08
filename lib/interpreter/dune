@@ -1,0 +1,4 @@
+(library
+ (name interpreter)
+ (libraries parser)
+ (package ollisp))
