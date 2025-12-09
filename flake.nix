@@ -7,21 +7,18 @@
   outputs = {self, nixpkgs}: 
   let
     pkgs = nixpkgs.legacyPackages.x86_64-linux;
+    nativeOcamlInputs = with pkgs.ocamlPackages; [menhir merlin dune_3];
+    nativeInputs = with pkgs; [ocaml];
   in
   {
     packages.x86_64-linux.default = pkgs.ocamlPackages.buildDunePackage {
       pname = "ollisp";
       version = "0.0.1";
       src = pkgs.lib.cleanSource ./.;
-      preBuildPhase = "ls -R";
-      nativeBuildInputs = with pkgs; [
-        ocamlPackages.menhir
-      ];
+      nativeBuildInputs = nativeInputs ++ nativeOcamlInputs;
     };
     devShells.x86_64-linux.default = pkgs.mkShell {
-      nativeBuildInputs = with pkgs.ocamlPackages; [
-        menhir merlin dune_3
-      ];
+      nativeBuildInputs = nativeInputs ++ nativeOcamlInputs;
     };
   };
 }
