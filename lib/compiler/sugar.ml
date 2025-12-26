@@ -32,10 +32,15 @@ let rec collect_definitions = function
      LCons (LCons (var, LCons (value, LNil)), defs), rest
   | rest -> LNil, rest
 
+(* Uses collect_definitions to rewrite a lambda body's (define) forms
+   into letrec
+   see desugar_internal_define
+ *)
 let make_letrec body =
   let (defs, rest) = collect_definitions body in
-  LCons (LSymbol "letrec", LCons (defs, rest))
-  
+  match defs with
+  | LNil -> rest
+  | _ -> LCons (LCons (LSymbol "letrec", LCons (defs, rest)), LNil)
 
 (* (define (f ...) ...)
    into
@@ -52,26 +57,46 @@ let rec desugar_define_function = function
      sexpr_map desugar_define_function expr 
   | expr -> expr
 
+(* A lambda form's body must be a sequence of definitions, followed by
+   expressions to be evaluated.
+   This desugar phase rewrites the definitions (which must be at the start
+   of the lambda body) into a letrec form.
 
+   Example:
+   (lambda ()
+     (define (f) (display "hi"))
+     (f)
+     (f))
+   into:
+   (lambda ()
+     (letrec
+       ((f (lambda () (display "hi"))))
+       (f) (f)))  
+ *)
 and desugar_internal_define = function
   | LCons (LSymbol "lambda", LCons (args, body)) ->
-     LCons (LSymbol "lambda", LCons (args, (LCons (make_letrec body, LNil))))
+     LCons (LSymbol "lambda", LCons (args, (make_letrec body)))
   | LCons (_, _) as expr ->
      sexpr_map desugar_internal_define expr
   | expr -> expr
-(* Turn all lambda and define bodies into begins *)
+(* Turn bodies of lambdas and letrec's *)
 and beginize = function
-  | LCons (LSymbol "lambda", LCons (args, body)) ->
+  | LCons (LSymbol "letrec" as sym, LCons (args, body))
+  | LCons (LSymbol "lambda" as sym, LCons (args, body)) ->
+     let body = beginize body in
      let body = (match body with
      | LCons (_, LCons (_, _)) as b ->
-        LCons (LSymbol "begin", b)
+        LCons (LCons (LSymbol "begin", b), LNil)
      | _ -> body) in
-     LCons (LSymbol "lambda", LCons (args, body))
+     LCons (sym, LCons (args, body))
   | LCons (_, _) as expr ->
      sexpr_map beginize expr
   | expr -> expr
+
+
 
 and desugar x =
   x
   |> desugar_define_function
   |> desugar_internal_define
+  |> beginize
