@@ -42,6 +42,20 @@ let make_letrec body =
   | LNil -> rest
   | _ -> LCons (LCons (LSymbol "letrec", LCons (defs, rest)), LNil)
 
+let make_single_let sym value body =
+  let val_list = LCons (sym, LCons (value, LNil)) in
+  let full_list = LCons (val_list, LNil) in
+  list_to_sexpr
+    [LSymbol "let"; full_list; body]
+
+let make_if cond t e =
+  list_to_sexpr
+    [LSymbol "if"; cond; t; e]
+
+let make_letif sym value cond t e =
+  make_single_let sym value
+    (make_if cond t e)
+
 (* (define (f ...) ...)
    into
    (define f (lambda (...) ...))
@@ -93,10 +107,44 @@ and beginize = function
      sexpr_map beginize expr
   | expr -> expr
 
+(*
+  (or a b)
+  turns into
+  (let ((__generated_or1 a))
+   (if __generated_or1
+    __generated_or1
+    (let ((__generated_or2 b))
+     (if __generated_or2
+       __generated_or2
+       ()))))
+ *)
+and desugar_logical_or = function
+  | LCons (LSymbol "or", LCons (f, rest)) ->
+     let sym = LSymbol (Gensym.gensym "or") in
+     let f = desugar_logical_or f in
+     let rest = LCons (LSymbol "or", rest) in
+     make_letif sym f sym sym (desugar_logical_or rest)
+  | LCons (LSymbol "or", LNil) ->
+     LNil (* TODO: Change this when/if you add #t/#f *)
+  | LCons (_, _) as expr ->
+     sexpr_map desugar_logical_or expr
+  | expr -> expr
 
-
+and desugar_logical_and = function
+  | LCons (LSymbol "and", LCons (first, rest)) ->
+     let sym = LSymbol (Gensym.gensym "and") in
+     let first = desugar_logical_and first in
+     let rest = LCons (LSymbol "and", rest) in
+     make_letif sym first sym (desugar_logical_and rest) sym
+  | LCons (LSymbol "and", LNil) ->
+     LSymbol "t" (* TODO: change this when/if you add #t/#f *)
+  | LCons (_, _) as expr ->
+     sexpr_map desugar_logical_and expr
+  | expr -> expr
 and desugar x =
   x
   |> desugar_define_function
   |> desugar_internal_define
   |> beginize
+  |> desugar_logical_or
+  |> desugar_logical_and
