@@ -22,7 +22,6 @@ let rec sexpr_map f = function
   | LNil -> LNil
   | _ -> failwith "Not proper list!!!"
 
-
 (* This MUST be called after function definitions have been desugared,
    i.e. desugar_define_functions has been called
  *)
@@ -41,20 +40,6 @@ let make_letrec body =
   match defs with
   | LNil -> rest
   | _ -> LCons (LCons (LSymbol "letrec", LCons (defs, rest)), LNil)
-
-let make_single_let sym value body =
-  let val_list = LCons (sym, LCons (value, LNil)) in
-  let full_list = LCons (val_list, LNil) in
-  list_to_sexpr
-    [LSymbol "let"; full_list; body]
-
-let make_if cond t e =
-  list_to_sexpr
-    [LSymbol "if"; cond; t; e]
-
-let make_letif sym value cond t e =
-  make_single_let sym value
-    (make_if cond t e)
 
 (* (define (f ...) ...)
    into
@@ -93,6 +78,7 @@ let rec desugar_internal_define = function
   | LCons (_, _) as expr ->
      sexpr_map desugar_internal_define expr
   | expr -> expr
+
 (* Turn bodies of lambdas and letrec's *)
 let rec beginize = function
   | LCons (LSymbol "letrec" as sym, LCons (args, body))
@@ -106,6 +92,21 @@ let rec beginize = function
   | LCons (_, _) as expr ->
      sexpr_map beginize expr
   | expr -> expr
+
+(* These are helper functions for the logical and/or desugars. *)
+let make_single_let sym value body =
+  let val_list = LCons (sym, LCons (value, LNil)) in
+  let full_list = LCons (val_list, LNil) in
+  list_to_sexpr
+    [LSymbol "let"; full_list; body]
+
+let make_if cond t e =
+  list_to_sexpr
+    [LSymbol "if"; cond; t; e]
+
+let make_letif sym value cond t e =
+  make_single_let sym value
+    (make_if cond t e)
 
 (*
   (or a b)
@@ -142,6 +143,23 @@ let rec desugar_logical_and = function
      sexpr_map desugar_logical_and expr
   | expr -> expr
 
+let rec cond_helper = function
+  | LCons (LCons (condition, then_), rest) ->
+     (* we need to desugar recursively, here as well. *)
+     let condition = desugar_cond condition in 
+     let then_ = desugar_cond then_ in
+     make_if condition (LCons (LSymbol "begin", then_)) (cond_helper rest)
+  | LNil -> LNil
+  | _ -> failwith "improper cond!" 
+
+and desugar_cond = function
+  | LCons (LSymbol "cond", (LCons (_, _) as conditions)) ->
+     cond_helper conditions
+  | LCons (_, _) as expr ->
+     sexpr_map desugar_cond expr
+  | expr -> expr
+     
+
 let desugar x =
   x
   |> desugar_define_function
@@ -149,3 +167,4 @@ let desugar x =
   |> beginize
   |> desugar_logical_or
   |> desugar_logical_and
+  |> desugar_cond

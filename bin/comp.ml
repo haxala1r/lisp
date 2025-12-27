@@ -21,7 +21,11 @@ and dbg_print_start = function
 let def = Parser.parse_str "(define (f x) (+ x 1))
                             (define (f)
                               (define (g y) (* y 2))
-                              (or (g 5) (g 6)))";;
+                              (or (g 5) (g 6)))
+                            (cond
+                             ((> 1 2) 0)
+                             ((> 3 2) 3)
+                             (t -1))";;
 let desugared = List.map Compiler.Sugar.desugar def
 let () = List.iter (fun x -> Printf.printf "%s\n" (dbg_print_start x) ) desugared
 let () = print_newline ()
