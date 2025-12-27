@@ -14,7 +14,7 @@ let double = digit* '.' digit+ | digit+ '.' digit*
 let white = [' ' '\t']+
 let newline = '\r' | '\n' | "\r\n"
 
-let sym_char = ['a'-'z' 'A'-'Z' '!' '\\' '+' '-' '*' '/' '_' '?']
+let sym_char = ['a'-'z' 'A'-'Z' '!' '\\' '+' '-' '*' '/' '_' '?' '=' '>' '<']
 let sym = sym_char sym_char*
 
 let str = '"' [^'"']* '"'
