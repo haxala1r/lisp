@@ -78,6 +78,10 @@ let sexpr_caddr cons =
   let* cddr = sexpr_cddr cons in
   sexpr_car cddr
 
+let expect_sym = function
+  | LSymbol s -> Ok s
+  | _ -> Error "Expected symbol!"
+
 (* We must now transform the s-expression tree into a proper, typed AST
    First, we need some utilities for transforming proper lists and s-expr conses.
 
@@ -150,6 +154,24 @@ and builtin_lambda cons =
   let* body = parse_body body in
   exp (Lambda (lambda_list, body))
 
+and parse_bindings cons =
+  let parse_one cons =
+    let* sym = sexpr_car cons in
+    let* sym = expect_sym sym in
+    let* expr = sexpr_cadr cons in
+    let* expr = unwrap_exp (transform expr) in
+    Ok (LetBinding (sym, expr))
+  in
+  let* l = list_of_sexpr cons in
+  Result.map_l parse_one l
+
+and make_builtin_let f cons =
+  let* bindings = sexpr_cadr cons in
+  let* bindings = parse_bindings bindings in
+  let* body = sexpr_cddr cons in
+  let* body = parse_body body in
+  exp (f bindings body)
+
 and apply f args =
   let* args = list_of_sexpr args in
   let* args = Result.map_l (fun x -> unwrap_exp (transform x)) args in
@@ -159,6 +181,8 @@ and apply f args =
 and builtin_symbol = function
   | "define" -> builtin_define
   | "lambda" -> builtin_lambda
+  | "let" -> (make_builtin_let (fun x y -> Let (x,y)))
+  | "letrec" -> (make_builtin_let (fun x y -> LetRec (x,y)))
   | _ -> (function
        | LCons (f, args) -> apply f args
        | _ -> Error "Invalid function application!")
@@ -191,6 +215,8 @@ and print_lambda_list = function
 and print_let_binding x =
   let (LetBinding (s, expr)) = x in
   pf "(%s %s)" s (print_expr expr)
+and print_bindings l =
+  ("(" ^ (String.concat "\n" (map print_let_binding l)) ^ ")")
 and  print_def = function
   | Define (s, expr) ->
      pf "(define %s
@@ -221,7 +247,7 @@ and print_expr = function
            %s
            ; EXPRESSIONS
            %s)"
-       (String.concat "\n" (map print_let_binding binds))
+       (print_bindings binds)
        (print_defs defs)
        (print_exprs exprs)
   | LetRec (binds, Body (defs, exprs)) ->
@@ -232,7 +258,7 @@ and print_expr = function
            %s
            ; EXPRESSIONS
            %s)"
-       (String.concat "\n" (map print_let_binding binds))
+       (print_bindings binds)
        (print_defs defs)
        (print_exprs exprs)
   | Var s -> s
