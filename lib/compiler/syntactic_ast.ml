@@ -29,7 +29,7 @@ type _ t =
 
   | LetBinding : symbol * expression t -> binding t
   | Let : binding t list * body t -> expression t
-  | LetRec : binding t list * expression t list -> expression t
+  | LetRec : binding t list * body t -> expression t
 
   | CondClause : expression t * expression t -> clause t
   | Cond : clause t list -> expression t
@@ -218,6 +218,17 @@ and print_expr = function
            ; BINDINGS
            %s
            ; DEFINITIONS
+           %s
+           ; EXPRESSIONS
+           %s)"
+       (String.concat "\n" (map print_let_binding binds))
+       (print_defs defs)
+       (print_exprs exprs)
+  | LetRec (binds, Body (defs, exprs)) ->
+     pf "(letrec
+           ; BINDINGS
+           %s
+           ; BODY
            %s
            ; EXPRESSIONS
            %s)"

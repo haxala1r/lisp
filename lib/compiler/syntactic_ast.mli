@@ -1,4 +1,5 @@
 type symbol = string
+
 (* These are just used for the GADT *)
 type expression
 type definition
@@ -22,7 +23,7 @@ type _ t =
 
   | LetBinding : symbol * expression t -> binding t
   | Let : binding t list * body t -> expression t
-  | LetRec : binding t list * expression t list -> expression t
+  | LetRec : binding t list * body t -> expression t
 
   | CondClause : expression t * expression t -> clause t
   | Cond : clause t list -> expression t
