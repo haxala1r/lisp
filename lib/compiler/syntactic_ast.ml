@@ -42,11 +42,6 @@ type top_level =
 
 let ( let* ) = Result.( let* )
 let map = List.map
-let nth_err err l n =
-  match List.nth_opt l n with
-  | None -> err
-  | Some v -> Ok v
-
 let exp x = Ok (Exp x)
 let unwrap_exp = function
   | Ok (Exp x) -> Ok x
@@ -58,9 +53,7 @@ let unwrap_def x =
   | Def d -> Ok d
   | _ -> Error "Expression found in Definition context"
 let def x = Ok (Def x)
-let is_def = function
-  | Def _ -> true
-  | _ -> false
+
 
 open Parser.Ast
 
@@ -79,14 +72,12 @@ let sexpr_cddr cons =
 let sexpr_caddr cons =
   let* cddr = sexpr_cddr cons in
   sexpr_car cddr
-let sexpr_cdddr cons =
-  let* cddr = sexpr_cddr cons in
-  sexpr_cdr cddr
 
 (* We must now transform the s-expression tree into a proper, typed AST
    First, we need some utilities for transforming proper lists and s-expr conses.
 
    TODO: add diagnostics, e.g. what sexpr, specifically, couldn't be turned to a list?
+   generally more debugging is needed in this module.
  *)
 let rec list_of_sexpr = function
   | LCons (i, next) ->
@@ -100,38 +91,33 @@ let parse_lambda_list cons =
   let rec aux acc = function
     | LCons (LSymbol a, LSymbol b) ->
        Ok (LambdaList (List.rev (a :: acc), Some b))
-    | LCons (LSymbol a, LNil) ->
-       Ok (LambdaList (List.rev (a :: acc), None))
     | LCons (LSymbol a, rest) ->
        aux (a :: acc) rest
+    | LNil -> Ok (LambdaList (List.rev acc, None))
     | _ -> Error "Improper lambda list."
   in aux [] cons
 
-let next_of_cons err_msg = function
-  | LCons (car, rest) -> Ok (car, rest)
-  | _ -> Error err_msg
-
-let rec a x = b x
-and b x = c x
-and c _ = a 5;;
-
-
-
-let rec parse_lambda_body body =
-  let is_def = function
+(* Is the given lisp_ast node a definition? *)
+let is_def = function
     | LCons (LSymbol "define", _) -> true
     | _ -> false
-  in
+
+(* These five functions all depend on each other, which is why they are
+   defined in this let..and chain.
+ *)
+let rec parse_lambda_body body =
+  (* This helper function separates the definitions and expressions from the body *)
   let rec aux acc = function
     | expr :: rest when is_def expr ->
        aux (expr :: acc) rest
-    | _ :: rest ->
-       Ok (acc, rest)
-    | [] -> Ok (acc, [])
+    | rest ->
+       Ok (List.rev acc, rest)
   in
   let* body = list_of_sexpr body in
-  let* (defs, exprs) = aux [] body in
-  
+  let* (defs, exprs) = aux [] body in  
+  (* Once the expressions and definitions are separated we must parse them, then
+     unpack them from the top_level type.
+   *)
   let* defs = Result.map_l (Fun.compose transform unwrap_def) defs in
   let* exprs = Result.map_l (Fun.compose transform unwrap_exp) exprs in
   Ok (defs, exprs)
@@ -152,6 +138,12 @@ and builtin_define cons =
      def (Define (sym, Lambda (lambda_list, defs, exprs)))
   | _ -> Error "lmao"
 
+and builtin_lambda cons =
+  let* second = sexpr_cadr cons in
+  let* body = sexpr_cddr cons in
+  let* lambda_list = parse_lambda_list second in
+  let* (defs, exprs) = parse_lambda_body body in
+  exp (Lambda (lambda_list, defs, exprs))
 
 and apply f args =
   let* args = list_of_sexpr args in
@@ -161,6 +153,7 @@ and apply f args =
 
 and builtin_symbol = function
   | "define" -> builtin_define
+  | "lambda" -> builtin_lambda
   | _ -> (function
        | LCons (f, args) -> apply f args
        | _ -> Error "Invalid function application!")
@@ -179,3 +172,53 @@ and transform : lisp_ast -> (top_level, string) result = function
 
 let make (expr : Parser.Ast.lisp_ast) : (top_level, string) result =
   transform expr
+
+
+
+(* Printing, for debug purposes *)
+let pf = Printf.sprintf
+let rec print_as_list l =
+  let l = map print_expr l in
+  String.concat " " l
+and print_lambda_list = function
+  | LambdaList (strs, None) -> ("(" ^ (String.concat " " strs) ^ ")")
+  | LambdaList (strs, Some x) -> ("(" ^ (String.concat " " strs) ^ " . " ^  x ^ ")")
+and print_let_binding x =
+  let (LetBinding (s, expr)) = x in
+  pf "(%s %s)" s (print_expr expr)
+and  print_def = function
+  | Define (s, expr) ->
+     pf "(define %s
+         %s)" s (print_expr expr)
+
+and print_expr = function
+  | LitDouble x -> pf "%f" x
+  | LitInt x -> pf "%d" x
+  | LitString x -> pf "\"%s\"" x
+  | LitNil -> pf "nil"
+  | QuotedList (exprs, None) -> "(" ^ (print_as_list exprs) ^ ")"
+  | QuotedList (exprs, Some ex) -> "(" ^ (print_as_list exprs) ^ " . " ^ (print_expr ex) ^ ")"
+  | Lambda (ll, defs, exprs) ->
+     pf "(lambda %s
+           ; DEFINITIONS
+           %s
+           ; BODY
+           %s)"
+       (print_lambda_list ll)
+       (String.concat "\n" (map print_def defs))
+       (String.concat "\n" (map print_expr exprs))
+  | Let (binds, exprs) ->
+     pf "(let %s
+           %s)"
+       (String.concat "\n" (map print_let_binding binds))
+       (String.concat "\n" (map print_expr exprs))
+  | Var s -> s
+  | Apply (f, exprs) ->
+     pf "(apply %s %s)"
+       (print_expr f)
+       ("(" ^ (String.concat " " (map print_expr exprs)) ^ ")")
+  | _ -> "WHATEVER"
+
+let print = function
+  | Def x -> print_def x
+  | Exp x -> print_expr x
