@@ -12,19 +12,24 @@ type definition
 type clause (* for cond *)
 type binding (* for let *)
 type lambda_list
+type body
 
 type _ t =
+  (* Literals *)
   | LitInt : int -> expression t
   | LitDouble : float -> expression t
   | LitString : string -> expression t
   | LitNil : expression t
   | QuotedList : expression t list * expression t option -> expression t
+
+  | Body : definition t list * expression t list -> body t
   | LambdaList : symbol list * symbol option -> lambda_list t
-  | Lambda : lambda_list t * definition t list * expression t list -> expression t
+  | Lambda : lambda_list t * body t -> expression t
   | Define : symbol * expression t -> definition t
 
   | LetBinding : symbol * expression t -> binding t
-  | Let : binding t list * expression t list -> expression t
+  | Let : binding t list * body t -> expression t
+  | LetRec : binding t list * expression t list -> expression t
 
   | CondClause : expression t * expression t -> clause t
   | Cond : clause t list -> expression t
@@ -105,7 +110,7 @@ let is_def = function
 (* These five functions all depend on each other, which is why they are
    defined in this let..and chain.
  *)
-let rec parse_lambda_body body =
+let rec parse_body body =
   (* This helper function separates the definitions and expressions from the body *)
   let rec aux acc = function
     | expr :: rest when is_def expr ->
@@ -120,7 +125,7 @@ let rec parse_lambda_body body =
    *)
   let* defs = Result.map_l (Fun.compose transform unwrap_def) defs in
   let* exprs = Result.map_l (Fun.compose transform unwrap_exp) exprs in
-  Ok (defs, exprs)
+  Ok (Body (defs, exprs))
 
 and builtin_define cons = 
   let* second = sexpr_cadr cons in
@@ -134,16 +139,16 @@ and builtin_define cons =
      (* function definition, we treat this as a define + lambda *)
      let* lambda_list = parse_lambda_list ll in
      let* body = sexpr_cddr cons in
-     let* (defs, exprs) = parse_lambda_body body in
-     def (Define (sym, Lambda (lambda_list, defs, exprs)))
+     let* body = parse_body body in
+     def (Define (sym, Lambda (lambda_list, body)))
   | _ -> Error "lmao"
 
 and builtin_lambda cons =
-  let* second = sexpr_cadr cons in
+  let* lambda_list = sexpr_cadr cons in
+  let* lambda_list = parse_lambda_list lambda_list in
   let* body = sexpr_cddr cons in
-  let* lambda_list = parse_lambda_list second in
-  let* (defs, exprs) = parse_lambda_body body in
-  exp (Lambda (lambda_list, defs, exprs))
+  let* body = parse_body body in
+  exp (Lambda (lambda_list, body))
 
 and apply f args =
   let* args = list_of_sexpr args in
@@ -189,8 +194,9 @@ and print_let_binding x =
 and  print_def = function
   | Define (s, expr) ->
      pf "(define %s
-         %s)" s (print_expr expr)
-
+           %s)" s (print_expr expr)
+and print_defs l =
+  String.concat "\n" (map print_def l)
 and print_expr = function
   | LitDouble x -> pf "%f" x
   | LitInt x -> pf "%d" x
@@ -198,7 +204,7 @@ and print_expr = function
   | LitNil -> pf "nil"
   | QuotedList (exprs, None) -> "(" ^ (print_as_list exprs) ^ ")"
   | QuotedList (exprs, Some ex) -> "(" ^ (print_as_list exprs) ^ " . " ^ (print_expr ex) ^ ")"
-  | Lambda (ll, defs, exprs) ->
+  | Lambda (ll, Body (defs, exprs)) ->
      pf "(lambda %s
            ; DEFINITIONS
            %s
@@ -207,17 +213,25 @@ and print_expr = function
        (print_lambda_list ll)
        (String.concat "\n" (map print_def defs))
        (String.concat "\n" (map print_expr exprs))
-  | Let (binds, exprs) ->
-     pf "(let %s
+  | Let (binds, Body (defs, exprs)) ->
+     pf "(let
+           ; BINDINGS
+           %s
+           ; DEFINITIONS
+           %s
+           ; EXPRESSIONS
            %s)"
        (String.concat "\n" (map print_let_binding binds))
-       (String.concat "\n" (map print_expr exprs))
+       (print_defs defs)
+       (print_exprs exprs)
   | Var s -> s
   | Apply (f, exprs) ->
      pf "(apply %s %s)"
        (print_expr f)
        ("(" ^ (String.concat " " (map print_expr exprs)) ^ ")")
   | _ -> "WHATEVER"
+and print_exprs l =
+  String.concat "\n" (map print_expr l)
 
 let print = function
   | Def x -> print_def x

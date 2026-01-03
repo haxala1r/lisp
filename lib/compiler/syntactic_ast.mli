@@ -5,19 +5,24 @@ type definition
 type clause (* for cond *)
 type binding (* for let *)
 type lambda_list
+type body
 
 type _ t =
+  (* Literals *)
   | LitInt : int -> expression t
   | LitDouble : float -> expression t
   | LitString : string -> expression t
   | LitNil : expression t
   | QuotedList : expression t list * expression t option -> expression t
+
+  | Body : definition t list * expression t list -> body t
   | LambdaList : symbol list * symbol option -> lambda_list t
-  | Lambda : lambda_list t * definition t list * expression t list -> expression t
+  | Lambda : lambda_list t * body t -> expression t
   | Define : symbol * expression t -> definition t
 
   | LetBinding : symbol * expression t -> binding t
-  | Let : binding t list * expression t list -> expression t
+  | Let : binding t list * body t -> expression t
+  | LetRec : binding t list * expression t list -> expression t
 
   | CondClause : expression t * expression t -> clause t
   | Cond : clause t list -> expression t
