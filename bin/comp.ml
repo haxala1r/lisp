@@ -20,7 +20,7 @@ and dbg_print_start = function
 
 let def = Parser.parse_str "(define (f)
                              (let ((x 5))
-                              (+ x 1)))
+                              (cond ((+ x 1)))))
                             (define (f)
                               (define (g y) (* y 2))
                               (or (g 5) (g 6)))

@@ -172,6 +172,22 @@ and make_builtin_let f cons =
   let* body = parse_body body in
   exp (f bindings body)
 
+and parse_clauses cons =
+  let parse_one cons =
+    let* test = sexpr_car cons in
+    let* test = unwrap_exp (transform test) in
+    let* expr = sexpr_cadr cons in
+    let* expr = unwrap_exp (transform expr) in
+    Ok (CondClause (test, expr))
+  in
+  let* l = list_of_sexpr cons in
+  Result.map_l parse_one l
+
+and builtin_cond cons =
+  let* clauses = sexpr_cadr cons in
+  let* clauses = parse_clauses clauses in
+  exp (Cond clauses)
+
 and apply f args =
   let* args = list_of_sexpr args in
   let* args = Result.map_l (fun x -> unwrap_exp (transform x)) args in
@@ -183,6 +199,7 @@ and builtin_symbol = function
   | "lambda" -> builtin_lambda
   | "let" -> (make_builtin_let (fun x y -> Let (x,y)))
   | "letrec" -> (make_builtin_let (fun x y -> LetRec (x,y)))
+  | "cond" -> builtin_cond
   | _ -> (function
        | LCons (f, args) -> apply f args
        | _ -> Error "Invalid function application!")
@@ -217,6 +234,11 @@ and print_let_binding x =
   pf "(%s %s)" s (print_expr expr)
 and print_bindings l =
   ("(" ^ (String.concat "\n" (map print_let_binding l)) ^ ")")
+and print_clause x =
+  let (CondClause (test, expr)) = x in
+  pf "(%s %s)" (print_expr test) (print_expr expr)
+and print_clauses l =
+  ("(" ^ (String.concat "\n" (map print_clause l)) ^ ")")
 and  print_def = function
   | Define (s, expr) ->
      pf "(define %s
@@ -261,12 +283,16 @@ and print_expr = function
        (print_bindings binds)
        (print_defs defs)
        (print_exprs exprs)
+  | Cond (clauses) ->
+     pf "(cond
+           %s)"
+       (print_clauses clauses)
   | Var s -> s
   | Apply (f, exprs) ->
      pf "(apply %s %s)"
        (print_expr f)
        ("(" ^ (String.concat " " (map print_expr exprs)) ^ ")")
-  | _ -> "WHATEVER"
+(* | _ -> "WHATEVER" *)
 and print_exprs l =
   String.concat "\n" (map print_expr l)
 
