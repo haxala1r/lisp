@@ -28,6 +28,8 @@ type _ t =
   | CondClause : expression t * expression t -> clause t
   | Cond : clause t list -> expression t
 
+  | If : expression t * expression t * expression t -> expression t
+
   | Var : symbol -> expression t
   | Apply : expression t * expression t list -> expression t
 

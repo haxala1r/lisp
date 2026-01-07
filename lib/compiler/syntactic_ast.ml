@@ -34,6 +34,8 @@ type _ t =
   | CondClause : expression t * expression t -> clause t
   | Cond : clause t list -> expression t
 
+  | If : expression t * expression t * expression t -> expression t
+
   | Var : symbol -> expression t
   | Apply : expression t * expression t list -> expression t
 
@@ -188,6 +190,18 @@ and builtin_cond cons =
   let* clauses = parse_clauses clauses in
   exp (Cond clauses)
 
+and builtin_if cons =
+  let* cons = sexpr_cdr cons in
+  let* test = sexpr_car cons in
+  let* test = unwrap_exp (transform test) in
+  let* then_branch = sexpr_cadr cons in
+  let* then_branch = unwrap_exp (transform then_branch) in
+  let* else_branch = (match sexpr_caddr cons with
+  | Error _ -> Ok LNil
+  | Ok x -> Ok x) in
+  let* else_branch = unwrap_exp (transform else_branch) in
+  exp (If (test, then_branch, else_branch))
+
 and apply f args =
   let* args = list_of_sexpr args in
   let* args = Result.map_l (fun x -> unwrap_exp (transform x)) args in
@@ -200,6 +214,7 @@ and builtin_symbol = function
   | "let" -> (make_builtin_let (fun x y -> Let (x,y)))
   | "letrec" -> (make_builtin_let (fun x y -> LetRec (x,y)))
   | "cond" -> builtin_cond
+  | "if" -> builtin_if
   | _ -> (function
        | LCons (f, args) -> apply f args
        | _ -> Error "Invalid function application!")
@@ -288,6 +303,8 @@ and print_expr = function
            %s)"
        (print_clauses clauses)
   | Var s -> s
+  | If (e1, e2, e3) ->
+     pf "(if %s %s %s)" (print_expr e1) (print_expr e2) (print_expr e3)
   | Apply (f, exprs) ->
      pf "(apply %s %s)"
        (print_expr f)
