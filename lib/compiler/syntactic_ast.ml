@@ -204,6 +204,7 @@ and builtin_if cons =
   exp (If (test, then_branch, else_branch))
 
 and builtin_set cons =
+  let* cons = sexpr_cdr cons in
   let* sym = sexpr_car cons in
   let* sym = (match sym with
              | LSymbol s -> Ok s
