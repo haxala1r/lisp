@@ -35,6 +35,7 @@ type _ t =
   | Cond : clause t list -> expression t
 
   | If : expression t * expression t * expression t -> expression t
+  | Set : string * expression t -> expression t
 
   | Var : symbol -> expression t
   | Apply : expression t * expression t list -> expression t
@@ -147,7 +148,7 @@ and builtin_define cons =
      let* body = sexpr_cddr cons in
      let* body = parse_body body in
      def (Define (sym, Lambda (lambda_list, body)))
-  | _ -> Error "lmao"
+  | _ -> Error "invalid definition!"
 
 and builtin_lambda cons =
   let* lambda_list = sexpr_cadr cons in
@@ -202,6 +203,15 @@ and builtin_if cons =
   let* else_branch = unwrap_exp (transform else_branch) in
   exp (If (test, then_branch, else_branch))
 
+and builtin_set cons =
+  let* sym = sexpr_car cons in
+  let* sym = (match sym with
+             | LSymbol s -> Ok s
+             | _ -> Error "cannot (set!) a non-symbol") in
+  let* expr = sexpr_cadr cons in
+  let* expr = unwrap_exp (transform expr) in
+  exp (Set (sym, expr))
+
 and apply f args =
   let* args = list_of_sexpr args in
   let* args = Result.map_l (fun x -> unwrap_exp (transform x)) args in
@@ -215,6 +225,7 @@ and builtin_symbol = function
   | "letrec" -> (make_builtin_let (fun x y -> LetRec (x,y)))
   | "cond" -> builtin_cond
   | "if" -> builtin_if
+  | "set!" -> builtin_set
   | _ -> (function
        | LCons (f, args) -> apply f args
        | _ -> Error "Invalid function application!")
@@ -305,6 +316,8 @@ and print_expr = function
   | Var s -> s
   | If (e1, e2, e3) ->
      pf "(if %s %s %s)" (print_expr e1) (print_expr e2) (print_expr e3)
+  | Set (s, expr) ->
+     pf "(set! %s %s)" s (print_expr expr)
   | Apply (f, exprs) ->
      pf "(apply %s %s)"
        (print_expr f)
