@@ -187,7 +187,7 @@ and parse_clauses cons =
   Result.map_l parse_one l
 
 and builtin_cond cons =
-  let* clauses = sexpr_cadr cons in
+  let* clauses = sexpr_cdr cons in
   let* clauses = parse_clauses clauses in
   exp (Cond clauses)
 
@@ -264,7 +264,7 @@ and print_clause x =
   let (CondClause (test, expr)) = x in
   pf "(%s %s)" (print_expr test) (print_expr expr)
 and print_clauses l =
-  ("(" ^ (String.concat "\n" (map print_clause l)) ^ ")")
+  (String.concat "\n" (map print_clause l))
 and  print_def = function
   | Define (s, expr) ->
      pf "(define %s
