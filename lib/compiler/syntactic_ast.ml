@@ -7,12 +7,12 @@ open Containers
 type symbol = string
 
 (* These are just used for the GADT *)
-type expression
-type definition
-type clause (* for cond *)
-type binding (* for let *)
-type lambda_list
-type body
+type expression = Phantom_expr
+type definition = Phantom_def
+type clause = Phantom_clause (* for cond *)
+type binding = Phantom_binding(* for let *)
+type lambda_list = Phantom_lambda_list
+type body = Phantom_body
 
 type _ t =
   (* Literals *)
