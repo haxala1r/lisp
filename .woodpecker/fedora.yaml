@@ -1,0 +1,12 @@
+when:
+  event: [push, cron, pull_request, manual]
+
+steps:
+  - name: Build on Fedora
+    image: fedora:43
+    pull: true
+    commands:
+      - dnf update
+      - dnf install -y ocaml ocaml-findlib menhir dune
+      - dune build
+      - dune exec ollisp
