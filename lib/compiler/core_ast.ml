@@ -79,3 +79,8 @@ and of_syntactic : Syntactic_ast.top_level -> top_level = function
   | Def (Define (s, e)) -> Define (s, of_expr e)
   | Exp (e) -> Expr (of_expr e)
   | _ -> .
+
+
+let of_sexpr x =
+  Result.bind (Syntactic_ast.make x)
+    (fun x -> Ok (of_syntactic x))
