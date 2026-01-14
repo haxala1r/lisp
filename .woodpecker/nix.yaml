@@ -1,9 +1,10 @@
+when:
+  event: [push, cron, pull_request, manual]
 
 steps:
-  - name: build-nix
+  - name: Build on NixOS
     image: nixos/nix:latest
-    when:
-      event: [tag, push, cron]
+    pull: true
     commands:
       - nix --extra-experimental-features nix-command --extra-experimental-features flakes build
       - ./result/bin/ollisp

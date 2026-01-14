@@ -2,7 +2,7 @@ when:
   event: [push, cron, pull_request, manual]
 
 steps:
-  - name: Debian
+  - name: Build on Debian
     image: debian:13
     pull: true
     commands:
