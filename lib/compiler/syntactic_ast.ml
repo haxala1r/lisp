@@ -1,4 +1,3 @@
-open Containers
 
 (* The entire point of this module is to transform a given sexpr tree into
    an intermediary typed AST.
@@ -47,9 +46,17 @@ type top_level =
 
 
 (* we use result here to make things nicer *)
-
-let ( let* ) = Result.( let* )
+let ( let* ) = Result.bind
+let traverse f l =
+  let rec aux acc = function
+    | x :: xs ->
+       let* result = f x in
+       aux (result :: acc) xs
+    | [] -> Ok (List.rev acc) in
+  aux [] l
 let map = List.map
+
+
 let exp x = Ok (Exp x)
 let unwrap_exp = function
   | Ok (Exp x) -> Ok x
@@ -130,8 +137,8 @@ let rec parse_body body =
   (* Once the expressions and definitions are separated we must parse them, then
      unpack them from the top_level type.
    *)
-  let* defs = Result.map_l (Fun.compose transform unwrap_def) defs in
-  let* exprs = Result.map_l (Fun.compose transform unwrap_exp) exprs in
+  let* defs = traverse (Fun.compose unwrap_def transform) defs in
+  let* exprs = traverse (Fun.compose unwrap_exp transform) exprs in
   Ok (Body (defs, exprs))
 
 and builtin_define cons = 
@@ -166,7 +173,7 @@ and parse_bindings cons =
     Ok (LetBinding (sym, expr))
   in
   let* l = list_of_sexpr cons in
-  Result.map_l parse_one l
+  traverse parse_one l
 
 and make_builtin_let f cons =
   let* bindings = sexpr_cadr cons in
@@ -184,7 +191,7 @@ and parse_clauses cons =
     Ok (CondClause (test, expr))
   in
   let* l = list_of_sexpr cons in
-  Result.map_l parse_one l
+  traverse parse_one l
 
 and builtin_cond cons =
   let* clauses = sexpr_cdr cons in
@@ -215,7 +222,7 @@ and builtin_set cons =
 
 and apply f args =
   let* args = list_of_sexpr args in
-  let* args = Result.map_l (fun x -> unwrap_exp (transform x)) args in
+  let* args = traverse (fun x -> unwrap_exp (transform x)) args in
   let* f = unwrap_exp (transform f) in
   exp (Apply (f, args))
 

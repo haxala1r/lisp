@@ -11,7 +11,7 @@
     pkgs = nixpkgs.legacyPackages.${system};
     devInputs = with pkgs.ocamlPackages; [merlin];
     ocamlPkgs = with pkgs.ocamlPackages; [menhir dune_3];
-    libs = with pkgs.ocamlPackages; [findlib containers];
+    libs = with pkgs.ocamlPackages; [findlib];
     nativeInputs =  with pkgs; ocamlPkgs ++ [ocaml];
   in
   {
