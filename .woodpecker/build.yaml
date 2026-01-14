@@ -1,9 +1,10 @@
+when:
+  event: [push cron pull_request manual]
 
 steps:
-  - name: build-nix
-    image: nixos/nix:latest
-    when:
-      event: [tag, push, cron]
+  - name: Debian
+    image: debian:13
+    pull: true
     commands:
-      - nix --extra-experimental-features nix-command --extra-experimental-features flakes build
-      - ./result/bin/ollisp
+      - apt update && apt full-upgrade && apt install -y ocaml libfind-ocaml-dev libcontainers-ocaml-dev ocaml-dune
+      - dune build
