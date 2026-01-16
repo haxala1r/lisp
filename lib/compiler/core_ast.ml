@@ -14,9 +14,8 @@ type literal =
 type expression =
   | Literal of literal
   | Var of string
-  | Apply of expression * expression list
-  | Lambda of string list * expression
-  | Let of (string * expression) list * expression
+  | Apply of expression * expression
+  | Lambda of string * expression
   | LetRec of (string * expression) list * expression
   | If of expression * expression * expression
   | Set of string * expression
@@ -37,12 +36,41 @@ and pair_of_binding = function
   | Syntactic_ast.LetBinding (s, e) -> (s, of_expr e)
 and pair_of_clause = function
   | Syntactic_ast.CondClause (e1, e2) -> (of_expr e1, of_expr e2)
+
+and make_lambda args body =
+  match args with
+    (* TODO: gensym here instead of using _ directly *)
+  | [] -> Lambda ("_", of_body body)
+  | x :: [] -> Lambda (x, of_body body)
+  | x :: xs -> Lambda (x, make_lambda xs body)
+
+and make_apply f args =
+  let rec aux f = function
+    | [] -> Apply (f, Literal Nil)
+    | arg :: [] -> Apply (f, arg)
+    | arg :: args -> aux (Apply (f, arg)) args
+  in aux f args
+(* desugars this...
+  (let ((x 5) (y 4)) (f x y))
+  ... into this...
+  (((lambda (x) (lambda (y) ((f x) y))) 5) 4)
+ *)
+and make_let bs body =
+  let bs = List.map pair_of_binding bs in
+  let rec aux = function
+    | (s, e) :: rest ->
+       Apply (Lambda (s, aux rest), e)
+    | [] -> of_body body in
+  aux bs
 (* We convert a body into a regular letrec form.
    A body is defined as a series of definitions followed by a series
    of expressions. The definitions behave exactly as a letrec, so
    it makes sense to convert the body into a normal letrec.
  *)
 and of_body : Syntactic_ast.body Syntactic_ast.t -> expression = function
+  | Body ([], exprs) ->
+     let exprs = List.map of_expr exprs in
+     Begin exprs
   | Body (defs, exprs) ->
      let exprs = List.map of_expr exprs in
      let defs = List.map pair_of_def defs in
@@ -61,8 +89,8 @@ and of_expr : Syntactic_ast.expression Syntactic_ast.t -> expression = function
   | LitString x -> Literal (String x)
   | Var x -> Var x
   | QuotedList _ -> failwith "TODO: rethink how quoted lists should work, the current definition makes no sense."
-  | Lambda (ll, b) -> Lambda (of_ll ll, of_body b)
-  | Let (bindings, b) -> Let (List.map pair_of_binding bindings, of_body b)
+  | Lambda (ll, b) -> make_lambda (of_ll ll) b
+  | Let (bindings, b) -> make_let bindings b
   | LetRec (bindings, b) -> LetRec (List.map pair_of_binding bindings, of_body b)
   | Cond (clauses) -> 
      List.fold_right
@@ -72,7 +100,7 @@ and of_expr : Syntactic_ast.expression Syntactic_ast.t -> expression = function
   | If (e1, e2, e3) ->
      If (of_expr e1, of_expr e2, of_expr e3)
   | Set (s, e) -> Set (s, of_expr e)
-  | Apply (f, es) -> Apply (of_expr f, List.map of_expr es)
+  | Apply (f, es) -> make_apply (of_expr f) (List.map of_expr es)
 
 
 and of_syntactic : Syntactic_ast.top_level -> top_level = function
