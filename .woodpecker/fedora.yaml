@@ -6,7 +6,7 @@ steps:
     image: fedora:43
     pull: true
     commands:
-      - dnf update
+      - dnf update -y
       - dnf install -y ocaml ocaml-findlib menhir dune
       - dune build
       - dune exec ollisp

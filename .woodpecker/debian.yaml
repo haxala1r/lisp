@@ -6,7 +6,7 @@ steps:
     image: debian:13
     pull: true
     commands:
-      - apt update && apt full-upgrade
+      - apt update && apt full-upgrade -y
       - apt install -y ocaml libfindlib-ocaml-dev ocaml-dune menhir
       - dune build
       - dune exec ollisp
