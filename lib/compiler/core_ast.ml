@@ -28,8 +28,6 @@ type top_level =
 
 
 
-
-
 let rec pair_of_def : Syntactic_ast.definition Syntactic_ast.t -> string * expression = function
   | Syntactic_ast.Define (s, e) -> (s, of_expr e)
 and pair_of_binding = function
@@ -53,7 +51,7 @@ and make_apply f args =
 (* desugars this...
   (let ((x 5) (y 4)) (f x y))
   ... into this...
-  (((lambda (x) (lambda (y) ((f x) y))) 5) 4)
+  (((lambda (x) (lambda (y) ((f x) y)))  5)  4)
  *)
 and make_let bs body =
   let bs = List.map pair_of_binding bs in
