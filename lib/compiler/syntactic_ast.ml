@@ -1,48 +1,35 @@
 
 (* The entire point of this module is to transform a given sexpr tree into
-   an intermediary typed AST.
+   an intermediary AST that directly represents the grammar.
  *)
 
-type symbol = string
+(* Literals *)
+type literal =
+  | LitInt of int
+  | LitDouble of float
+  | LitString of string
+  | LitCons of literal * literal
+  | LitNil
 
-(* These are just used for the GADT *)
-type expression = Phantom_expr
-type definition = Phantom_def
-type clause = Phantom_clause (* for cond *)
-type binding = Phantom_binding(* for let *)
-type lambda_list = Phantom_lambda_list
-type body = Phantom_body
+type lambda_list = string list * string option
 
-type _ t =
-  (* Literals *)
-  | LitInt : int -> expression t
-  | LitDouble : float -> expression t
-  | LitString : string -> expression t
-  | LitNil : expression t
-  | QuotedList : expression t list * expression t option -> expression t
-
-  | Body : definition t list * expression t list -> body t
-  | LambdaList : symbol list * symbol option -> lambda_list t
-  | Lambda : lambda_list t * body t -> expression t
-  | Define : symbol * expression t -> definition t
-
-  | LetBinding : symbol * expression t -> binding t
-  | Let : binding t list * body t -> expression t
-  | LetRec : binding t list * body t -> expression t
-
-  | CondClause : expression t * expression t -> clause t
-  | Cond : clause t list -> expression t
-
-  | If : expression t * expression t * expression t -> expression t
-  | Set : string * expression t -> expression t
-
-  | Var : symbol -> expression t
-  | Apply : expression t * expression t list -> expression t
+type expr =
+  | Literal of literal
+  | Lambda of lambda_list * body
+  | Let of (string * expr) list * body
+  | LetRec of (string * expr) list * body
+  | Cond of (expr * expr) list
+  | If of expr * expr * expr
+  | Set of string * expr
+  | Var of string
+  | Apply of expr * expr list
+and def = string * expr
+and body = def list * expr list
 
 (* On the top-level we only allow definitions and expressions *)
 type top_level =
-  | Def of definition t
-  | Exp of expression t
+  | Def of def
+  | Exp of expr
 
 
 (* we use result here to make things nicer *)
@@ -57,7 +44,7 @@ let traverse f l =
 let map = List.map
 
 
-let exp x = Ok (Exp x)
+
 let unwrap_exp = function
   | Ok (Exp x) -> Ok x
   | Error _ as e -> e
@@ -67,6 +54,8 @@ let unwrap_def x =
   match x with
   | Def d -> Ok d
   | _ -> Error "Expression found in Definition context"
+let exp x = Ok (Exp x)
+let lit x = Ok (Exp (Literal x))
 let def x = Ok (Def x)
 
 
@@ -109,10 +98,10 @@ let rec list_of_sexpr = function
 let parse_lambda_list cons =
   let rec aux acc = function
     | LCons (LSymbol a, LSymbol b) ->
-       Ok (LambdaList (List.rev (a :: acc), Some b))
+       Ok (List.rev (a :: acc), Some b)
     | LCons (LSymbol a, rest) ->
        aux (a :: acc) rest
-    | LNil -> Ok (LambdaList (List.rev acc, None))
+    | LNil -> Ok (List.rev acc, None)
     | _ -> Error "Improper lambda list."
   in aux [] cons
 
@@ -139,7 +128,7 @@ let rec parse_body body =
    *)
   let* defs = traverse (Fun.compose unwrap_def transform) defs in
   let* exprs = traverse (Fun.compose unwrap_exp transform) exprs in
-  Ok (Body (defs, exprs))
+  Ok (defs, exprs)
 
 and builtin_define cons = 
   let* second = sexpr_cadr cons in
@@ -148,13 +137,13 @@ and builtin_define cons =
      (* regular, symbol/variable definition *)
      let* third = sexpr_caddr cons in
      let* value = unwrap_exp (transform third) in
-     def (Define (sym, value))
+     Ok (Def (sym, value))
   | LCons (LSymbol sym, ll) ->
      (* function definition, we treat this as a define + lambda *)
      let* lambda_list = parse_lambda_list ll in
      let* body = sexpr_cddr cons in
      let* body = parse_body body in
-     def (Define (sym, Lambda (lambda_list, body)))
+     Ok (Def (sym, Lambda (lambda_list, body)))
   | _ -> Error "invalid definition!"
 
 and builtin_lambda cons =
@@ -170,7 +159,7 @@ and parse_bindings cons =
     let* sym = expect_sym sym in
     let* expr = sexpr_cadr cons in
     let* expr = unwrap_exp (transform expr) in
-    Ok (LetBinding (sym, expr))
+    Ok (sym, expr)
   in
   let* l = list_of_sexpr cons in
   traverse parse_one l
@@ -188,7 +177,7 @@ and parse_clauses cons =
     let* test = unwrap_exp (transform test) in
     let* expr = sexpr_cadr cons in
     let* expr = unwrap_exp (transform expr) in
-    Ok (CondClause (test, expr))
+    Ok (test, expr)
   in
   let* l = list_of_sexpr cons in
   traverse parse_one l
@@ -239,14 +228,14 @@ and builtin_symbol = function
        | _ -> Error "Invalid function application!")
 
 and transform : lisp_ast -> (top_level, string) result = function
-  | LInt x -> exp (LitInt x)
-  | LDouble x -> exp (LitDouble x)
-  | LString x -> exp (LitString x)
+  | LInt x -> lit (LitInt x)
+  | LDouble x -> lit (LitDouble x)
+  | LString x -> lit (LitString x)
   (* NOTE: not all symbols are automatically Variable expressions,
      Some must be further parsed (such as inside a definition)
    *)
   | LSymbol x -> exp (Var x)
-  | LNil -> exp (LitNil)
+  | LNil -> lit (LitNil)
   | LCons (LSymbol s, _) as cons -> (builtin_symbol s) cons
   | LCons (f, args) -> apply f args
 
@@ -257,36 +246,36 @@ let make (expr : Parser.Ast.lisp_ast) : (top_level, string) result =
 
 (* Printing, for debug purposes *)
 let pf = Printf.sprintf
-let rec print_as_list l =
-  let l = map print_expr l in
-  String.concat " " l
-and print_lambda_list = function
-  | LambdaList (strs, None) -> ("(" ^ (String.concat " " strs) ^ ")")
-  | LambdaList (strs, Some x) -> ("(" ^ (String.concat " " strs) ^ " . " ^  x ^ ")")
+let rec print_lambda_list = function
+  | (strs, None) -> ("(" ^ (String.concat " " strs) ^ ")")
+  | (strs, Some x) -> ("(" ^ (String.concat " " strs) ^ " . " ^  x ^ ")")
 and print_let_binding x =
-  let (LetBinding (s, expr)) = x in
+  let (s, expr) = x in
   pf "(%s %s)" s (print_expr expr)
 and print_bindings l =
   ("(" ^ (String.concat "\n" (map print_let_binding l)) ^ ")")
 and print_clause x =
-  let (CondClause (test, expr)) = x in
+  let (test, expr) = x in
   pf "(%s %s)" (print_expr test) (print_expr expr)
 and print_clauses l =
   (String.concat "\n" (map print_clause l))
 and  print_def = function
-  | Define (s, expr) ->
+  | (s, expr) ->
      pf "(define %s
            %s)" s (print_expr expr)
 and print_defs l =
   String.concat "\n" (map print_def l)
-and print_expr = function
+
+and print_literal = function
   | LitDouble x -> pf "%f" x
   | LitInt x -> pf "%d" x
   | LitString x -> pf "\"%s\"" x
   | LitNil -> pf "nil"
-  | QuotedList (exprs, None) -> "(" ^ (print_as_list exprs) ^ ")"
-  | QuotedList (exprs, Some ex) -> "(" ^ (print_as_list exprs) ^ " . " ^ (print_expr ex) ^ ")"
-  | Lambda (ll, Body (defs, exprs)) ->
+  | LitCons (a, b) -> pf "(%s . %s)" (print_literal a) (print_literal b)
+
+and print_expr = function
+  | Literal l -> print_literal l
+  | Lambda (ll, (defs, exprs)) ->
      pf "(lambda %s
            ; DEFINITIONS
            %s
@@ -295,7 +284,7 @@ and print_expr = function
        (print_lambda_list ll)
        (String.concat "\n" (map print_def defs))
        (String.concat "\n" (map print_expr exprs))
-  | Let (binds, Body (defs, exprs)) ->
+  | Let (binds, (defs, exprs)) ->
      pf "(let
            ; BINDINGS
            %s
@@ -306,7 +295,7 @@ and print_expr = function
        (print_bindings binds)
        (print_defs defs)
        (print_exprs exprs)
-  | LetRec (binds, Body (defs, exprs)) ->
+  | LetRec (binds, (defs, exprs)) ->
      pf "(letrec
            ; BINDINGS
            %s

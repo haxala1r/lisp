@@ -28,12 +28,10 @@ type top_level =
 
 
 
-let rec pair_of_def : Syntactic_ast.definition Syntactic_ast.t -> string * expression = function
-  | Syntactic_ast.Define (s, e) -> (s, of_expr e)
-and pair_of_binding = function
-  | Syntactic_ast.LetBinding (s, e) -> (s, of_expr e)
-and pair_of_clause = function
-  | Syntactic_ast.CondClause (e1, e2) -> (of_expr e1, of_expr e2)
+let rec pair_of_def : Syntactic_ast.def -> string * expression =
+  fun (s, e) -> (s, of_expr e)
+and pair_of_binding (s, e) = (s, of_expr e)
+and pair_of_clause (e1, e2) = (of_expr e1, of_expr e2)
 
 and make_lambda args body =
   match args with
@@ -65,11 +63,11 @@ and make_let bs body =
    of expressions. The definitions behave exactly as a letrec, so
    it makes sense to convert the body into a normal letrec.
  *)
-and of_body : Syntactic_ast.body Syntactic_ast.t -> expression = function
-  | Body ([], exprs) ->
+and of_body : Syntactic_ast.body -> expression = function
+  | ([], exprs) ->
      let exprs = List.map of_expr exprs in
      Begin exprs
-  | Body (defs, exprs) ->
+  | (defs, exprs) ->
      let exprs = List.map of_expr exprs in
      let defs = List.map pair_of_def defs in
      let b = Begin exprs in
@@ -77,16 +75,19 @@ and of_body : Syntactic_ast.body Syntactic_ast.t -> expression = function
 
 (* TODO: currently this ignores the "optional" part of the lambda list,
    fix this *)
-and of_ll : Syntactic_ast.lambda_list Syntactic_ast.t -> string list = function
-  | LambdaList (sl, _) -> sl
+and of_ll : Syntactic_ast.lambda_list -> string list = function
+  | (sl, _) -> sl
 
-and of_expr : Syntactic_ast.expression Syntactic_ast.t -> expression = function
-  | LitNil -> Literal Nil
-  | LitInt x -> Literal (Int x)
-  | LitDouble x -> Literal (Double x)
-  | LitString x -> Literal (String x)
+and of_literal : Syntactic_ast.literal -> literal  = function
+  | LitInt x -> Int x
+  | LitDouble x -> Double x
+  | LitString x -> String x
+  | LitCons (a, b) -> Cons (of_literal a, of_literal b)
+  | LitNil -> Nil
+  
+and of_expr : Syntactic_ast.expr -> expression = function
+  | Literal l -> Literal (of_literal l)
   | Var x -> Var x
-  | QuotedList _ -> failwith "TODO: rethink how quoted lists should work, the current definition makes no sense."
   | Lambda (ll, b) -> make_lambda (of_ll ll) b
   | Let (bindings, b) -> make_let bindings b
   | LetRec (bindings, b) -> LetRec (List.map pair_of_binding bindings, of_body b)
@@ -102,7 +103,7 @@ and of_expr : Syntactic_ast.expression Syntactic_ast.t -> expression = function
 
 
 and of_syntactic : Syntactic_ast.top_level -> top_level = function
-  | Def (Define (s, e)) -> Define (s, of_expr e)
+  | Def (s, e) -> Define (s, of_expr e)
   | Exp (e) -> Expr (of_expr e)
   | _ -> .
 
