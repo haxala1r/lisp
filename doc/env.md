@@ -74,21 +74,50 @@ is propagated outwards, and adder also accesses it as a free variable. The compi
 (when propagating free symbols) eventually reaches the global environment, and
 resolves these free symbols to their global definitions.
 
-This behaviour is necessary (for some definition of "necessary") to ensure correct runtime
-behaviour. This is because all symbols are `set!`able. Thus, the adder function can be
-defined while `+` is bound to its builtin value, then modified into a different value.
-The following is valid:
+All global symbols are late-bound. Once the free symbol is propagated outwards to the global
+definition, the compiler must notice this and insert an instruction to get the
+value of a global symbol.
+
+Thus, the following will raise an error at runtime:
 
 ```
 (define (adder x)
   (lambda (y) (+ x y)))
 (set! '+ 5)
-; + now equals 5, but adder still works.
+; + now equals 5.
+(adder 5 5)
 ```
 
-This behaviour may seem ridiculous (why on earth would anyone define `+` to be `5`?),
-and it may be tempting to prevent using `set!` on standard library symbols, this is perfectly
-valid for global symbols defined by the user.
+Since `5` is not a function, it cannot be called, and this will raise an error.
+
+## Note on boxing
+
+Closure conversion makes some situations a bit tricky.
+
+```
+(let ((x 10))
+  (let ((f (lambda () x))) ;; f captures x
+    (set! x 20)            ;; we change local x
+    (f)))                  ;; does this return 10 or 20?
+```
+
+In this case, instead of x being copied directly into the closure, a
+reference to its value is copied into the closure. This is usual in
+most schemes and lisps.
+
+In fact, you can even treat these as mutable state:
+
+```
+(define (make-counter)
+ (let ((count 0))
+  (lambda ()
+    (set! count (+ count 1))
+    count)))
+```
+
+So a closure can capture not just the value of a symbol, but also a
+reference to it. This reference survives the end of the `make-counter`
+function.
 
 ## Note on currying
 
