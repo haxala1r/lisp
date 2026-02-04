@@ -16,7 +16,6 @@ type expression =
   | Var of string
   | Apply of expression * expression
   | Lambda of string * expression
-  (*| LetRec of (string * expression) list * expression   *)
   | If of expression * expression * expression
   | Set of string * expression
   | Begin of expression list
