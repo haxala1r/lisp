@@ -10,12 +10,12 @@ steps:
       - mkdir -p dist
       - opam exec -- dune install --prefix=$(pwd)/dist
 
-      - tar czvf ollisp-nightly.tar.gz -C dist .
+      - tar czvf ollisp-nightly-amd64.tar.gz -C dist .
   - name: Publish to Gitea
     image: curlimages/curl
     environment:
       GITEA_TOKEN:
         from_secret: package_token
     commands:
-      - curl -v --user "$CI_REPO_OWNER:$GITEA_TOKEN" --upload-file my-lang-nightly-linux-amd64.tar.gz $CI_FORGE_URL/api/packages/$CI_REPO_OWNER/generic/olisp/nightly/ollisp-nightly-amd64.tar.gz?duplicate_upgrade=true
+      - curl -v --user "$CI_REPO_OWNER:$GITEA_TOKEN" --upload-file ollisp-nightly-amd64.tar.gz $CI_FORGE_URL/api/packages/$CI_REPO_OWNER/generic/olisp/nightly/ollisp-nightly-amd64.tar.gz?duplicate_upgrade=true
   
