@@ -3,7 +3,7 @@ when:
 
 steps:
   - name: Build Nightly Artifact
-    image: ocaml/opam:debian-11-ocaml-5.1
+    image: ocaml/opam:debian-11-ocaml-5.4
     commands:
       - opam install . --deps-only
       - opam exec -- dune build
