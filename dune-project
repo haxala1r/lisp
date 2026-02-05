@@ -3,4 +3,5 @@
 (generate_opam_files true)
 
 (package
- (name ollisp))
+ (name ollisp)
+ (depends menhir))
