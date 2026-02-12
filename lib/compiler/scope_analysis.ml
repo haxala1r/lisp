@@ -87,7 +87,9 @@ let rec analyze tbl current = function
   | Set (sym, expr) ->
      let* inner = analyze tbl current expr in
      resolve_set tbl current sym inner
-  | Lambda (s, body) -> analyze tbl (s :: current) body
+  | Lambda (s, body) ->
+     let* body = (analyze tbl (s :: current) body) in
+     Ok (Lambda body)
   | Apply (f, e) ->
      let* f = analyze tbl current f in
      let* e = analyze tbl current e in
