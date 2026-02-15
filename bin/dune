@@ -1,10 +1,4 @@
 (executable
- (name inter)
- (public_name ollisp-inter)
- (libraries str unix interpreter)
- (package ollisp))
-
-(executable
  (name comp)
  (public_name ollisp)
- (libraries str unix compiler interpreter))
+ (libraries str unix compiler))
