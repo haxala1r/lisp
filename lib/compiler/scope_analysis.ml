@@ -81,24 +81,56 @@ let resolve_set tbl env sym expr =
   | Global i -> Ok (SetGlobal (i, expr))
   | _ -> Error "resolve_set: symbol resolution returned something invalid."
 
-let rec analyze tbl current = function
-  | Core_ast.Literal s -> Ok (Literal s)
-  | Var sym -> resolve_symbol tbl current sym
-  | Set (sym, expr) ->
-     let* inner = analyze tbl current expr in
-     resolve_set tbl current sym inner
-  | Lambda (s, body) ->
-     let* body = (analyze tbl (s :: current) body) in
-     Ok (Lambda body)
-  | Apply (f, e) ->
-     let* f = analyze tbl current f in
-     let* e = analyze tbl current e in
-     Ok (Apply (f, e))
-  | If (test, pos, neg) ->
-     let* test = analyze tbl current test in
-     let* pos = analyze tbl current pos in
-     let* neg = analyze tbl current neg in
-     Ok (If (test, pos, neg))
-  | Begin el ->
-     let* body = traverse (analyze tbl current) el in
-     Ok (Begin body)
+(* We need to do some more sophisticated analysis to detect cases where
+   a symbol is accessed before it is defined.
+   If a symbol is accessed in a lambda body, that is fine, since that computation
+   is delayed, but for top-level forms that are directly executed we must be strict.
+
+   The analyze function is strict by default, until it encounters a lambda, at which
+   point it switches to resolving against all symbols.
+   global_tbl is a table that contains ALL defined symbols,
+   tbl is a table that contains symbols defined only until this point.
+
+   NOTE: because we currently convert all let expressions into lambdas, things like
+   this won't immediately be rejected by the compiler:
+
+   (let ((a 5))
+     b)
+   (define b 5)
+
+   I may consider adding special support for let forms, as this is pretty annoying.
+ *)
+let convert program =
+  let global_tbl = extract_globals program in
+  let id_counter = (ref (-1)) in
+  let id () =
+    id_counter := !id_counter + 1; !id_counter in
+  let rec analyze tbl current = function
+    | Core_ast.Literal s -> Ok (Literal s)
+    | Var sym -> resolve_symbol tbl current sym
+    | Set (sym, expr) ->
+       let* inner = analyze tbl current expr in
+       resolve_set tbl current sym inner
+    | Lambda (s, body) ->
+       let* body = (analyze global_tbl (s :: current) body) in
+       Ok (Lambda body)
+    | Apply (f, e) ->
+       let* f = analyze tbl current f in
+       let* e = analyze tbl current e in
+       Ok (Apply (f, e))
+    | If (test, pos, neg) ->
+       let* test = analyze tbl current test in
+       let* pos = analyze tbl current pos in
+       let* neg = analyze tbl current neg in
+       Ok (If (test, pos, neg))
+    | Begin el ->
+       let* body = traverse (analyze tbl current) el in
+       Ok (Begin body)
+  in
+  let[@tail_mod_cons] rec aux tbl = function
+    | [] -> []
+    | (Core_ast.Expr e) :: rest -> (analyze tbl [] e) :: (aux tbl rest)
+    | (Define (s, e)) :: rest ->
+       let tbl = SymbolTable.add s (id ()) tbl in
+       (analyze tbl [] e) :: (aux tbl rest)
+  in aux SymbolTable.empty program
