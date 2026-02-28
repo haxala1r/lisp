@@ -133,4 +133,4 @@ let convert program =
     | (Define (s, e)) :: rest ->
        let tbl = SymbolTable.add s (id ()) tbl in
        (analyze tbl [] e) :: (aux tbl rest)
-  in aux SymbolTable.empty program
+  in traverse (fun x -> x) (aux SymbolTable.empty program)
