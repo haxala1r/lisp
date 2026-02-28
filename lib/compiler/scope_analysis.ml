@@ -134,3 +134,7 @@ let convert program =
        let tbl = SymbolTable.add s (id ()) tbl in
        (analyze tbl [] e) :: (aux tbl rest)
   in traverse (fun x -> x) (aux SymbolTable.empty program)
+
+let of_src src =
+  let* core = (Core_ast.of_src src) in
+  convert core

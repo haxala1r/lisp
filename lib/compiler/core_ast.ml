@@ -1,4 +1,6 @@
 
+let traverse = Util.traverse
+
 type literal =
   | Int of int
   | Double of float
@@ -121,3 +123,7 @@ and of_syntactic : Syntactic_ast.top_level -> top_level = function
 let of_sexpr x =
   Result.bind (Syntactic_ast.make x)
     (fun x -> Ok (of_syntactic x))
+
+let of_src src =
+  let sexprs = Parser.parse_str src in
+  traverse of_sexpr sexprs
