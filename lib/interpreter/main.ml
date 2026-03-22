@@ -66,7 +66,7 @@ let interpret program global_syms =
   let count = Compiler.Scope_analysis.SymbolTable.cardinal global_syms in
   let globals : runtime_value array = Array.make count Nil in
   
-  Ok (interpret_one (Begin program) [] globals)
+  interpret_one (Begin program) [] globals
 
 
 

@@ -86,7 +86,7 @@ let resolve_set tbl env sym expr =
    If a symbol is accessed in a lambda body, that is fine, since that computation
    is delayed, but for top-level forms that are directly executed we must be strict.
 
-   The analyze function is strict by default, until it encounters a lambda, at which
+   This function is strict by default, until it encounters a lambda, at which
    point it switches to resolving against all symbols.
    global_tbl is a table that contains ALL defined symbols,
    tbl is a table that contains symbols defined only until this point.
