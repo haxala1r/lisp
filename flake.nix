@@ -12,5 +12,6 @@
   in
   {
     packages.default = pkgs.callPackage ./default.nix {};
+    devShells.default = pkgs.callPackage ./shell.nix {};
   });
 }
