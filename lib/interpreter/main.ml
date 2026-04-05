@@ -26,11 +26,11 @@ let rec interpret_literal = function
 let rec interpret_one expr env globals =
   match expr with
   | Compiler.Scope_analysis.Literal l -> interpret_literal l
-  | Local i ->
+  | Var (Local i) ->
      (match (List.nth_opt env i) with
       | None -> Error "Error while accessing local variable!"
       | Some x -> Ok !x)
-  | Global i ->
+  | Var (Global i) ->
      Ok (Array.get globals i)
   | Apply (f, e) ->
      let* f = interpret_one f env globals in
@@ -47,13 +47,13 @@ let rec interpret_one expr env globals =
      (match test with
       | Nil -> interpret_one else_e env globals
       | _ -> interpret_one then_e env globals)
-  | SetLocal (i, e) ->
+  | Set ((Local i), e) ->
      (match (List.nth_opt env i) with
       | None -> Error "Error while setting local variable!"
       | Some r ->
          let* e = interpret_one e env globals in
          r := e; Ok e)
-  | SetGlobal (i, e) ->
+  | Set ((Global i), e) ->
      let* e = interpret_one e env globals in
      Array.set globals i e; Ok e
   | Begin [] -> Ok Nil

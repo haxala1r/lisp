@@ -8,28 +8,35 @@ let traverse = Util.traverse
 (* literals are not modified. *)
 type literal = Core_ast.literal
 
+(* I made this a separate type, because this behaviour is common to both symbol
+   accesses, and to set! operations on symbols.
+   They can both either refer to a local, or refer to a global, and making a
+   separate type for this lets us statically eliminate a couple potential
+   runtime errors
+ *)
+type variable =
+  | Local of int
+  | Global of int
+
 (* Note:
-   all symbol accesses are replaced with either a local or global access.
-   Local accesses a symbol in the local scope.
-   Global accesses a symbol in the global scope.
+   all symbol accesses are either referring to a local binding or a global one,
+   and this is distinguished through the variable type above.
 
    Lambda expressions are stripped of the symbol name of their single parameter.
    This name is not needed at runtime, as all symbol accesses will be resolved
    into an index into either the local scope linked list or the global symbol table.
 
-   Set is also split into its global and local versions, just like Var. 
+   Set is also split into its global and local versions, using the above variable type.
 
    The rest aren't modified at all.
  *)
 type expression =
   | Literal of literal
-  | Local of int
-  | Global of int
+  | Var of variable
   | Apply of expression * expression
   | Lambda of expression
   | If of expression * expression * expression
-  | SetLocal of int * expression
-  | SetGlobal of int * expression
+  | Set of variable * expression
   | Begin of expression list
 
 
@@ -64,23 +71,23 @@ let resolve_global tbl sym =
   | Some x -> Ok (Global x)
   | None -> Error ("symbol " ^ sym ^ " is not defined!")
 
-let resolve_lexical tbl env sym =
+(* First we try to resolve it to a local symbol, then look it up in the
+   global table if we can't find it in the local environment
+ *)
+let resolve_symbol tbl env sym =
   let rec aux counter = function
     | [] -> resolve_global tbl sym
     | x :: _ when String.equal x sym -> Ok (Local counter)
     | _ :: rest -> aux (counter + 1) rest
   in aux 0 env
 
-let resolve_symbol tbl env sym =
-  resolve_lexical tbl env sym
+let resolve_var tbl env sym =
+  let* sym = resolve_symbol tbl env sym in
+  Ok (Var sym)
 
 let resolve_set tbl env sym expr =
   let* sym = resolve_symbol tbl env sym in
-  match sym with
-  | Local i -> Ok (SetLocal (i, expr))
-  | Global i -> Ok (SetGlobal (i, expr))
-  | _ -> Error "resolve_set: symbol resolution returned something invalid."
-
+  Ok (Set (sym, expr))
 (* We need to do some more sophisticated analysis to detect cases where
    a symbol is accessed before it is defined.
    If a symbol is accessed in a lambda body, that is fine, since that computation
@@ -102,12 +109,9 @@ let resolve_set tbl env sym expr =
  *)
 let convert program =
   let global_tbl = extract_globals program in
-  let id_counter = (ref (-1)) in
-  let id () =
-    id_counter := !id_counter + 1; !id_counter in
   let rec analyze tbl current = function
     | Core_ast.Literal s -> Ok (Literal s)
-    | Var sym -> resolve_symbol tbl current sym
+    | Var sym -> resolve_var tbl current sym
     | Set (sym, expr) ->
        let* inner = analyze tbl current expr in
        resolve_set tbl current sym inner
@@ -131,7 +135,7 @@ let convert program =
     | [] -> []
     | (Core_ast.Expr e) :: rest -> (analyze tbl [] e) :: (aux tbl rest)
     | (Define (s, e)) :: rest ->
-       let tbl = SymbolTable.add s (id ()) tbl in
+       let tbl = SymbolTable.add s (SymbolTable.find s global_tbl) tbl in
        (analyze tbl [] (Set (s, e))) :: (aux tbl rest)
   in
   let* program = traverse (fun x -> x) (aux SymbolTable.empty program) in
