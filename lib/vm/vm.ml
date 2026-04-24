@@ -1,37 +1,7 @@
 
-type value =
-  | Int of int
-  | Double of float
-  | String of string
-  | Nil
-  | Cons of value * value
-  | Symbol of string
-  | Closure of int * value ref list
-  | NativeClosure of (value -> value)
+module Types = Types
+open Types
 
-type instr =  
-  | Constant of int
-  | LoadLocal of int
-  | LoadGlobal of int
-  | StoreLocal of int
-  | StoreGlobal of int
-  | Pop (* discards top of stack *)
-  | Apply
-  | MakeClosure of int
-  | Jump of int
-  | JumpF of int (* jump if false. *)
-  | End
-
-type vm_state = {
-    mutable i : int;
-    instrs : instr array;
-    globals : value array;
-    constants : value array;
-    mutable env : value ref list;
-    mutable stack : value list
-  }
-
-(* TODO: add facilities to print the VM state in case of errors. *)
 
 let do_local state i f =
   match List.nth_opt state.env i with
@@ -53,17 +23,17 @@ let push state v =
 let rec do_apply state =
   let cur_env = state.env in
   let cur_i = state.i in
-  let f = pop_one state in
   let arg = pop_one state in
+  let f = pop_one state in
   match f with
   | Closure (x, e) ->
-     state.env <- e;
+     state.env <- ref arg :: e;
      state.i <- x;
      interpret state;
      state.env <- cur_env;
      state.i <- cur_i
-  | NativeClosure f ->
-     push state (f arg)
+  | Native x ->
+     push state (Native.table.(x) arg)
   | _ -> failwith "Cannot apply non-closure object"
 
 and interpret state =
@@ -75,6 +45,10 @@ and interpret state =
   | LoadGlobal x -> push state state.globals.(x) ; interpret state
   | StoreLocal x -> set_local state x (pop_one state) ; interpret state
   | StoreGlobal x -> Array.set state.globals x (pop_one state) ; interpret state
+  | MakeCons ->
+     let cdr = pop_one state in
+     let car = pop_one state in
+     push state (Cons (car, cdr))
   | Pop -> ignore (pop_one state) ; interpret state
   | Apply -> do_apply state ; interpret state
   | MakeClosure x -> push state (Closure (x, state.env)); interpret state
