@@ -39,6 +39,24 @@ type expression =
   | Set of variable * expression
   | Begin of expression list
 
+(* IMPORTANT:
+   This is a predefined global table.
+   Some symbols in the standard library have special importance, so
+   they must have "special" values that exist before the program is
+   even compiled.
+   For example, the print function is always global. It must always
+   be global number 0. Most other primitives have similar assignments.
+
+   The runtime is not stable as it is now, so a program compiled with
+   a current version of the compiler may not remain functional with
+   later versions of the runtime. The source program should remain
+   good though.
+ *)
+let default_global_table =
+  SymbolTable.of_list [
+      ("print", 0);
+      ("add", 1)
+    ]
 
 (* extract all defined global symbols, given the top-level expressions
    and definitions of a program
@@ -57,7 +75,7 @@ let extract_globals (top : Core_ast.top_level list) =
        aux (SymbolTable.add sym (id ()) tbl) rest
     | Expr _ :: rest ->
        aux tbl rest
-  in aux SymbolTable.empty top
+  in aux default_global_table top
 
 (* The current lexical scope is simply a linked list of entries,
    and each symbol access will be resolved as an access to an index
