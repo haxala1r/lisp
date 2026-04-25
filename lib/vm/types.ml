@@ -36,4 +36,15 @@ type vm_state = {
     mutable stack : value list
   }
 
+
+let make_vm instrs constants global_count =
+  {
+    i = 0;
+    instrs = instrs;
+    globals = Array.make global_count Nil;
+    constants = constants;
+    env = [];
+    stack = [];
+  }
+
 (* TODO: add facilities to print the VM state in case of errors. *)

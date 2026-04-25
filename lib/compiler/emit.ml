@@ -108,6 +108,13 @@ let backpatch p =
   if Queue.is_empty p.backpatch then
     Ok ()
   else backpatch_one p (Queue.pop p.backpatch)
+
+let smooth_one = function
+  | Instr i -> i
+  | _ -> failwith "backpatching process was not complete!"
+let smooth_instrs p =
+  Dynarray.to_array (Dynarray.map smooth_one p.instrs)
+
 let compile (exprs : expression list) (tbl : int SymbolTable.t) =
   let program = {
       instrs=Dynarray.create ();
@@ -116,4 +123,6 @@ let compile (exprs : expression list) (tbl : int SymbolTable.t) =
       backpatch=Queue.create ();
     } in
   let* _ = compile_all program exprs in
-  backpatch program
+  let* _ = backpatch program in
+  let final_instrs = smooth_instrs program in
+  Ok (Vm.Types.make_vm final_instrs (Dynarray.to_array program.constants) (SymbolTable.cardinal tbl))
