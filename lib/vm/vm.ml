@@ -15,10 +15,10 @@ let set_local state i v =
 let pop_one state =
   match state.stack with
   | v :: rest -> state.stack <- rest; v
-  | [] -> failwith "VM error: cannot pop from empty stack!"
+  | [] -> failwith ("VM error: cannot pop from empty stack! " ^ (string_of_int state.i))
 
 let push state v =
-  state.stack <- v :: state.stack
+  state.stack <- (v :: state.stack)
 
 let rec do_apply state =
   let cur_env = state.env in
@@ -27,19 +27,21 @@ let rec do_apply state =
   let f = pop_one state in
   match f with
   | Closure (x, e) ->
-     state.env <- ref arg :: e;
+     state.call_stack <- (cur_i, cur_env) :: state.call_stack;
      state.i <- x;
-     interpret state;
-     state.env <- cur_env;
-     state.i <- cur_i
+     state.env <- (ref arg) :: e;
+     interpret state
   | Native x ->
      push state (Native.table.(x) arg)
   | _ -> failwith "Cannot apply non-closure object"
 
 and interpret state =
+  (match state.stack with
+  | [] -> print_endline "empty"
+  | _ -> print_endline "nonempty");
   let i = state.i in
   state.i <- i + 1;
-  (match state.instrs.(state.i) with
+  (match state.instrs.(i) with
   | Constant x -> push state state.constants.(x) ; interpret state
   | LoadLocal x -> push state (load_local state x) ; interpret state
   | LoadGlobal x -> push state state.globals.(x) ; interpret state
@@ -50,13 +52,32 @@ and interpret state =
      let car = pop_one state in
      push state (Cons (car, cdr))
   | Pop -> ignore (pop_one state) ; interpret state
-  | Apply -> do_apply state ; interpret state
+  | Apply -> do_apply state
   | MakeClosure x -> push state (Closure (x, state.env)); interpret state
   | Jump target -> state.i <- target ; interpret state
   | JumpF target ->
      (match (pop_one state) with
      | Nil -> state.i <- target
      | _ -> ()); interpret state 
-  | End -> ()
+  | End ->
+     (match state.call_stack with
+     | [] ->
+        print_endline "\nPROGRAM HAS SUCCESSFULLY TERMINATED\n"
+     | (old_i, old_env) :: rest ->
+        state.call_stack <- rest;
+        state.env <- old_env;
+        state.i <- old_i;
+        interpret state)
   | NOOP -> interpret state)
 
+let make_vm instrs constants global_count =
+  let globals = Array.init global_count (fun x -> if x < (Array.length Native.table) then Native x else Nil) in
+  {
+    i = 0;
+    instrs = instrs;
+    globals = globals;
+    constants = constants;
+    env = [];
+    stack = [];
+    call_stack = [];
+  }

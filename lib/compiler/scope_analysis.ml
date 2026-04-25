@@ -66,7 +66,7 @@ let default_global_table =
    be kept at runtime.
  *)
 let extract_globals (top : Core_ast.top_level list) =
-  let id_counter = (ref (-1)) in
+  let id_counter = (ref (SymbolTable.cardinal default_global_table)) in
   let id () =
     id_counter := !id_counter + 1; !id_counter in
   let rec aux tbl = function
@@ -156,7 +156,7 @@ let convert program =
        let tbl = SymbolTable.add s (SymbolTable.find s global_tbl) tbl in
        (analyze tbl [] (Set (s, e))) :: (aux tbl rest)
   in
-  let* program = traverse (fun x -> x) (aux SymbolTable.empty program) in
+  let* program = traverse (fun x -> x) (aux default_global_table program) in
   Ok (program, global_tbl)
 
 let of_src src =

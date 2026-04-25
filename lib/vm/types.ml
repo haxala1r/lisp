@@ -33,18 +33,30 @@ type vm_state = {
     globals : value array;
     constants : value array;
     mutable env : value ref list;
-    mutable stack : value list
+    mutable stack : value list;
+    mutable call_stack : (int * (value ref list)) list;
   }
 
 
-let make_vm instrs constants global_count =
-  {
-    i = 0;
-    instrs = instrs;
-    globals = Array.make global_count Nil;
-    constants = constants;
-    env = [];
-    stack = [];
-  }
+let p = Printf.sprintf 
+let print_one = function
+    | Constant i -> p "CONSTANT %d\n" i
+    | LoadLocal i -> p "LOCAL %d\n" i
+    | LoadGlobal i -> p "GLOBAL %d\n" i
+    | StoreLocal i -> p "STORE_LOCAL %d\n" i
+    | StoreGlobal i -> p "STORE_GLOBAL %d\n" i
+    | MakeCons -> p "CONS\n"
+    | Pop -> p "POP\n"
+    | Apply -> p "APPLY\n"
+    | MakeClosure i -> p "MKCLOSURE %d\n" i
+    | Jump i -> p "JMP %d\n" i
+    | JumpF i -> p "JMPF %d\n" i
+    | End -> p "END\n"
+    | NOOP -> p "NOOP\n"
 
-(* TODO: add facilities to print the VM state in case of errors. *)
+let print_instrs instrs =  
+  Array.mapi_inplace
+    (fun i ins ->
+      print_string (p "%d: %s" i (print_one ins));
+      ins)
+    instrs

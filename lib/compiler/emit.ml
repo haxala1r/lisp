@@ -104,11 +104,21 @@ let backpatch_one p (i, b) =
   Dynarray.set p.instrs i (Instr (MakeClosure (current_index p)));
   let* _ = compile_one p b in
   emit_instr p End
-let backpatch p =
+let rec backpatch p =
   if Queue.is_empty p.backpatch then
     Ok ()
-  else backpatch_one p (Queue.pop p.backpatch)
+  else
+    (let* _ = backpatch_one p (Queue.pop p.backpatch) in
+     backpatch p)
 
+
+let print_instr = function
+  | Instr i -> Vm.Types.print_one i
+  | BackPatchJumpF ->  "BACKPATCH JUMPF\n"
+  | BackPatchMkClosure -> "BACKPATCH CLOSURE\n"
+let print_instrs =
+  Array.mapi_inplace (fun i ins ->
+    print_endline (Printf.sprintf "%d: %s" i (print_instr ins)); ins)
 let smooth_one = function
   | Instr i -> i
   | _ -> failwith "backpatching process was not complete!"
@@ -123,6 +133,12 @@ let compile (exprs : expression list) (tbl : int SymbolTable.t) =
       backpatch=Queue.create ();
     } in
   let* _ = compile_all program exprs in
+  let* _ = emit_instr program End in
   let* _ = backpatch program in
   let final_instrs = smooth_instrs program in
-  Ok (Vm.Types.make_vm final_instrs (Dynarray.to_array program.constants) (SymbolTable.cardinal tbl))
+  print_endline (string_of_int (SymbolTable.cardinal tbl));
+  Ok (Vm.make_vm final_instrs (Dynarray.to_array program.constants) ((SymbolTable.cardinal tbl) + 1))
+
+let compile_src src =
+  let* (exprs, tbl) = Scope_analysis.of_src src in
+  compile exprs tbl
