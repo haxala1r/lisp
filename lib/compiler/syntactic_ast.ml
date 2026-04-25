@@ -9,6 +9,7 @@ type literal =
   | LitDouble of float
   | LitString of string
   | LitCons of literal * literal
+  | LitSymbol of string
   | LitNil
 
 type lambda_list = string list * string option
@@ -203,6 +204,18 @@ and builtin_set cons =
   let* expr = unwrap_exp (transform expr) in
   exp (Set (sym, expr))
 
+and builtin_quote cons =
+  let* expr = sexpr_cadr cons in
+  let lit x = exp (Literal x) in
+  let rec aux = function
+    | LSymbol s -> (LitSymbol s)
+    | LInt x -> (LitInt x)
+    | LDouble x -> (LitDouble x)
+    | LString x -> (LitString x)
+    | LCons (a, b) -> (LitCons (aux a, aux b))
+    | LNil -> (LitNil) in
+  lit (aux expr)
+
 and apply f args =
   let* args = list_of_sexpr args in
   let* args = traverse (fun x -> unwrap_exp (transform x)) args in
@@ -217,6 +230,7 @@ and builtin_symbol = function
   | "cond" -> builtin_cond
   | "if" -> builtin_if
   | "set!" -> builtin_set
+  | "quote" -> builtin_quote
   | _ -> (function
        | LCons (f, args) -> apply f args
        | _ -> Error "Invalid function application!")
@@ -236,7 +250,8 @@ and transform : lisp_ast -> (top_level, string) result = function
 let make (expr : Parser.Ast.lisp_ast) : (top_level, string) result =
   transform expr
 
-
+let of_src s =
+  Util.traverse make (Parser.parse_str s)
 
 (* Printing, for debug purposes *)
 let pf = Printf.sprintf
@@ -266,7 +281,7 @@ and print_literal = function
   | LitString x -> pf "\"%s\"" x
   | LitNil -> pf "nil"
   | LitCons (a, b) -> pf "(%s . %s)" (print_literal a) (print_literal b)
-
+  | LitSymbol s -> pf "'%s" s
 and print_expr = function
   | Literal l -> print_literal l
   | Lambda (ll, (defs, exprs)) ->

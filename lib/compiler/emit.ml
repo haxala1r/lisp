@@ -47,6 +47,7 @@ let rec compile_one p = function
   | Literal Nil -> emit_constant p (Vm.Types.Nil)
   | Literal (Double x) -> emit_constant p (Vm.Types.Double x)
   | Literal (String s) -> emit_constant p (Vm.Types.String s)
+  | Literal (Symbol s) -> emit_constant p (Vm.Types.Symbol s)
   | Literal (Cons (a, b)) ->
      let* _ = compile_one p (Literal a) in
      let* _ = compile_one p (Literal b) in
@@ -90,6 +91,7 @@ let rec compile_one p = function
      compile_one p e1
   | Begin (e1 :: e2 :: rest) ->
      let* _ = compile_one p e1 in
+     let* _ = emit_instr p Vm.Types.Pop in
      compile_one p (Begin (e2 :: rest))
 
 and compile_all p exprs =
@@ -136,7 +138,6 @@ let compile (exprs : expression list) (tbl : int SymbolTable.t) =
   let* _ = emit_instr program End in
   let* _ = backpatch program in
   let final_instrs = smooth_instrs program in
-  print_endline (string_of_int (SymbolTable.cardinal tbl));
   Ok (Vm.make_vm final_instrs (Dynarray.to_array program.constants) ((SymbolTable.cardinal tbl) + 1))
 
 let compile_src src =

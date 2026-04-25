@@ -20,6 +20,11 @@ let pop_one state =
 let push state v =
   state.stack <- (v :: state.stack)
 
+let trace state =
+  let stack () = List.fold_left (fun acc x -> acc ^ " " ^ (Types.print_value x)) "" state.stack in
+  let env () = List.fold_left (fun acc x -> acc ^ " " ^ (Types.print_value !x)) "" state.env in
+  Printf.printf "%d: \n\tstack: [%s ]\n\tenv:[%s]\n" state.i (stack ()) (env ())
+
 let rec do_apply state =
   let cur_env = state.env in
   let cur_i = state.i in
@@ -32,13 +37,11 @@ let rec do_apply state =
      state.env <- (ref arg) :: e;
      interpret state
   | Native x ->
-     push state (Native.table.(x) arg)
+     push state (Native.table.(x) arg);
+     interpret state
   | _ -> failwith "Cannot apply non-closure object"
 
 and interpret state =
-  (match state.stack with
-  | [] -> print_endline "empty"
-  | _ -> print_endline "nonempty");
   let i = state.i in
   state.i <- i + 1;
   (match state.instrs.(i) with
@@ -62,7 +65,7 @@ and interpret state =
   | End ->
      (match state.call_stack with
      | [] ->
-        print_endline "\nPROGRAM HAS SUCCESSFULLY TERMINATED\n"
+        print_endline "\nPROGRAM HAS SUCCESSFULLY TERMINATED"
      | (old_i, old_env) :: rest ->
         state.call_stack <- rest;
         state.env <- old_env;

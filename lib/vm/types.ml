@@ -39,6 +39,18 @@ type vm_state = {
 
 
 let p = Printf.sprintf 
+
+let rec print_value = function
+    | Int x -> p "%d" x
+    | Double x -> p "%f" x
+    | String x -> p "\"%s\"" x
+    | Nil -> p "'()"
+    | Cons (a, b) -> p "(%s . %s)" (print_value a) (print_value b)
+    | Symbol x -> p "'%s" x
+    | Closure (i, _) -> p "<closure %d>" i
+    | Native i -> p "<native %d>" i
+
+
 let print_one = function
     | Constant i -> p "CONSTANT %d\n" i
     | LoadLocal i -> p "LOCAL %d\n" i

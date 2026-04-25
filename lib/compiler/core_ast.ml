@@ -5,6 +5,7 @@ type literal =
   | Int of int
   | Double of float
   | String of string
+  | Symbol of string
   | Nil
   | Cons of literal * literal
 
@@ -96,6 +97,7 @@ and of_literal : Syntactic_ast.literal -> literal  = function
   | LitString x -> String x
   | LitCons (a, b) -> Cons (of_literal a, of_literal b)
   | LitNil -> Nil
+  | LitSymbol s -> Symbol s
   
 and of_expr : Syntactic_ast.expr -> expression = function
   | Literal l -> Literal (of_literal l)
