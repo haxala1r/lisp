@@ -7,7 +7,8 @@ let some_source = "(define (print-three a b c)
                     (print a)
                     (print b)
                     (print c))
-                   (print-three 'hello 'world 'there)";;
+                   (print-three 'hello 'world 'there)
+                   (print 'fuck)";;
 (* I don't have any built-in functions at all rn, so we just use a dummy function *)
 
 let bruh =

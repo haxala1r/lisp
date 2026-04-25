@@ -15,7 +15,11 @@ let set_local state i v =
 let pop_one state =
   match state.stack with
   | v :: rest -> state.stack <- rest; v
-  | [] -> failwith ("VM error: cannot pop from empty stack! " ^ (string_of_int state.i))
+  | [] -> failwith ("VM error: cannot pop from empty stack! " )
+let peek_one state =
+  match state.stack with
+  | v :: _ -> v
+  | [] -> failwith ("VM error: cannot peek on empty stack! " )
 
 let push state v =
   state.stack <- (v :: state.stack)
@@ -42,14 +46,15 @@ let rec do_apply state =
   | _ -> failwith "Cannot apply non-closure object"
 
 and interpret state =
+  trace state;
   let i = state.i in
   state.i <- i + 1;
   (match state.instrs.(i) with
   | Constant x -> push state state.constants.(x) ; interpret state
   | LoadLocal x -> push state (load_local state x) ; interpret state
   | LoadGlobal x -> push state state.globals.(x) ; interpret state
-  | StoreLocal x -> set_local state x (pop_one state) ; interpret state
-  | StoreGlobal x -> Array.set state.globals x (pop_one state) ; interpret state
+  | StoreLocal x -> set_local state x (peek_one state) ; interpret state
+  | StoreGlobal x -> Array.set state.globals x (peek_one state) ; interpret state
   | MakeCons ->
      let cdr = pop_one state in
      let car = pop_one state in

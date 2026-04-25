@@ -95,7 +95,10 @@ let rec compile_one p = function
      compile_one p (Begin (e2 :: rest))
 
 and compile_all p exprs =
-  Util.traverse (compile_one p) exprs
+  Util.traverse
+    (fun e ->
+      let* _ = compile_one p e in
+      emit_instr p Pop) exprs
 
 (* Once we have compiled the top-level expressions, we must now compile
    all of the lambdas we held off on. Some of these will hold more
