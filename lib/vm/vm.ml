@@ -57,5 +57,6 @@ and interpret state =
      (match (pop_one state) with
      | Nil -> state.i <- target
      | _ -> ()); interpret state 
-  | End -> ())
+  | End -> ()
+  | NOOP -> interpret state)
 

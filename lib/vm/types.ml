@@ -25,6 +25,7 @@ type instr =
   | Jump of int
   | JumpF of int (* jump if false. *)
   | End
+  | NOOP
 
 type vm_state = {
     mutable i : int;
