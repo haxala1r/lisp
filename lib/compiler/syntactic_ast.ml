@@ -82,13 +82,14 @@ let expect_sym = function
    TODO: add diagnostics, e.g. what sexpr, specifically, couldn't be turned to a list?
    generally more debugging is needed in this module.
  *)
-let rec list_of_sexpr = function
+let rec  list_of_sexpr = function
   | LCons (i, next) ->
      let* next = list_of_sexpr next in
      Ok (i :: next)
   | LNil -> Ok []
   | _ -> Error "cannot transform sexpr into list, malformed sexpr!"
 
+  
 (* parse the argument list of a lambda form *)
 let parse_lambda_list cons =
   let rec aux acc = function

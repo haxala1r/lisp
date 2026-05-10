@@ -33,8 +33,8 @@ type variable =
 type expression =
   | Literal of literal
   | Var of variable
-  | Apply of expression * expression
-  | Lambda of expression
+  | Apply of expression * expression list
+  | Lambda of int * expression
   | If of expression * expression * expression
   | Set of variable * expression
   | Begin of expression list
@@ -93,11 +93,13 @@ let resolve_global tbl sym =
    global table if we can't find it in the local environment
  *)
 let resolve_symbol tbl env sym =
-  let rec aux counter = function
+  let rec aux counter env_num = function
     | [] -> resolve_global tbl sym
-    | x :: _ when String.equal x sym -> Ok (Local counter)
-    | _ :: rest -> aux (counter + 1) rest
-  in aux 0 env
+    | x :: rest ->
+       match List.find_index (String.equal sym) x with
+       | Some i -> Ok (Local (counter + i))
+       | None  -> aux (counter + (List.length (x :: rest))) (env_num + 1) rest
+  in aux 0 0 env
 
 let resolve_var tbl env sym =
   let* sym = resolve_symbol tbl env sym in
@@ -106,6 +108,16 @@ let resolve_var tbl env sym =
 let resolve_set tbl env sym expr =
   let* sym = resolve_symbol tbl env sym in
   Ok (Set (sym, expr))
+
+let extract_function = function
+  | Core_ast.Define (s, Core_ast.Lambda (args, rest, _)) -> Some (s, args, rest)
+  | _ -> None
+
+let extract_functions exprs =
+  let fs = List.filter Option.is_some (List.map extract_function exprs) in
+  let fs = List.map Option.get fs in
+  List.fold_left (fun t (s, args, rest) -> SymbolTable.add s (args, rest) t) SymbolTable.empty fs
+
 (* We need to do some more sophisticated analysis to detect cases where
    a symbol is accessed before it is defined.
    If a symbol is accessed in a lambda body, that is fine, since that computation
@@ -133,12 +145,15 @@ let convert program =
     | Set (sym, expr) ->
        let* inner = analyze tbl current expr in
        resolve_set tbl current sym inner
-    | Lambda (s, body) ->
-       let* body = (analyze global_tbl (s :: current) body) in
-       Ok (Lambda body)
-    | Apply (f, e) ->
+    | Lambda (args, rest, body) ->
+       let args = (match rest with
+                  | Some s -> List.append args [s]
+                  | None -> args) in
+       let* body = (analyze global_tbl (args :: current) body) in
+       Ok (Lambda (List.length args, body))
+    | Apply (f, es) ->
        let* f = analyze tbl current f in
-       let* e = analyze tbl current e in
+       let* e = Util.traverse (analyze tbl current) es in
        Ok (Apply (f, e))
     | If (test, pos, neg) ->
        let* test = analyze tbl current test in

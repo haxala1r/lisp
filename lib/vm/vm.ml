@@ -16,6 +16,11 @@ let pop_one state =
   match state.stack with
   | v :: rest -> state.stack <- rest; v
   | [] -> failwith ("VM error: cannot pop from empty stack! " )
+let pop_args state count =
+  let rec aux acc i =
+    if i <= 0 then acc
+    else aux ((ref (pop_one state)) :: acc) (i - 1)
+  in aux [] count
 let peek_one state =
   match state.stack with
   | v :: _ -> v
@@ -29,19 +34,20 @@ let trace state =
   let env () = List.fold_left (fun acc x -> acc ^ " " ^ (Types.print_value !x)) "" state.env in
   Printf.printf "%d: \n\tstack: [%s ]\n\tenv:[%s]\n" state.i (stack ()) (env ())
 
-let rec do_apply state =
+let rec do_apply state arg_count =
   let cur_env = state.env in
   let cur_i = state.i in
-  let arg = pop_one state in
+  let args = pop_args state arg_count in
   let f = pop_one state in
   match f with
-  | Closure (x, e) ->
+  | Closure (a, _, _) when a != arg_count -> failwith "Wrong argument count to function"
+  | Closure (_, x, e) ->
      state.call_stack <- (cur_i, cur_env) :: state.call_stack;
      state.i <- x;
-     state.env <- (ref arg) :: e;
+     state.env <- List.append args e;
      interpret state
   | Native x ->
-     push state (Native.table.(x) arg);
+     push state (Native.table.(x) args);
      interpret state
   | _ -> failwith "Cannot apply non-closure object"
 
@@ -60,8 +66,8 @@ and interpret state =
      let car = pop_one state in
      push state (Cons (car, cdr))
   | Pop -> ignore (pop_one state) ; interpret state
-  | Apply -> do_apply state
-  | MakeClosure x -> push state (Closure (x, state.env)); interpret state
+  | Apply a -> do_apply state a
+  | MakeClosure (args, x) -> push state (Closure (args, x, state.env)); interpret state
   | Jump target -> state.i <- target ; interpret state
   | JumpF target ->
      (match (pop_one state) with

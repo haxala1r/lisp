@@ -6,7 +6,7 @@ type value =
   | Nil
   | Cons of value * value
   | Symbol of string
-  | Closure of int * value ref list
+  | Closure of int * int * value ref list
   | Native of int (* This is basically a syscall, each ID represents a primitive operation
                      that should have a well-defined effect. These will be further detailed
                      in the language documentation
@@ -20,8 +20,8 @@ type instr =
   | StoreGlobal of int
   | MakeCons
   | Pop (* discards top of stack *)
-  | Apply
-  | MakeClosure of int
+  | Apply of int (* arg count *)
+  | MakeClosure of int * int (* arg count, code pointer *)
   | Jump of int
   | JumpF of int (* jump if false. *)
   | End
@@ -47,7 +47,7 @@ let rec print_value = function
     | Nil -> p "'()"
     | Cons (a, b) -> p "(%s . %s)" (print_value a) (print_value b)
     | Symbol x -> p "'%s" x
-    | Closure (i, _) -> p "<closure %d>" i
+    | Closure (a, i, _) -> p "<closure of %d args at %d>" a i
     | Native i -> p "<native %d>" i
 
 
@@ -59,8 +59,8 @@ let print_one = function
     | StoreGlobal i -> p "STORE_GLOBAL %d\n" i
     | MakeCons -> p "CONS\n"
     | Pop -> p "POP\n"
-    | Apply -> p "APPLY\n"
-    | MakeClosure i -> p "MKCLOSURE %d\n" i
+    | Apply i -> p "APPLY %d\n" i
+    | MakeClosure (a, i) -> p "MKCLOSURE %d, %d\n" a i
     | Jump i -> p "JMP %d\n" i
     | JumpF i -> p "JMPF %d\n" i
     | End -> p "END\n"

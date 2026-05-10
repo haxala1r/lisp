@@ -5,8 +5,8 @@
  *)
 open Types
 
-let builtin_print (v : Types.value) =
-  print_endline (print_value v);
+let builtin_print (v : Types.value ref list) =
+  List.iter (fun r -> print_endline (print_value !r)) v;
   Types.Nil
 
 let table = [|

@@ -7,7 +7,7 @@ type instr = Vm.Types.instr
 
 type pre_instr =
   | Instr of instr
-  | BackPatchMkClosure
+  | BackPatchMkClosure of int
   | BackPatchJumpF
 
 type program = {
@@ -27,8 +27,8 @@ let current_index p =
 let set_instr p i ins =
   Dynarray.set p.instrs i (Instr ins)
 
-let emit_mkclosure p =
-  Ok (Dynarray.add_last p.instrs BackPatchMkClosure)
+let emit_mkclosure p i =
+  Ok (Dynarray.add_last p.instrs  (BackPatchMkClosure i))
 let emit_jumpf p =
   Ok (Dynarray.add_last p.instrs BackPatchJumpF)
 
@@ -62,12 +62,12 @@ let rec compile_one p = function
   | Set (Global i, expr) ->
      let* _ = compile_one p expr in
      emit_instr p (Vm.Types.StoreGlobal i)
-  | Apply (f, arg) ->
+  | Apply (f, args) ->
      let* _ = compile_one p f in
-     let* _ = compile_one p arg in
-     emit_instr p Vm.Types.Apply
-  | Lambda body ->
-     let* _ = emit_mkclosure p in
+     let* _ = compile_all_no_pop p args in
+     emit_instr p (Vm.Types.Apply (List.length args))
+  | Lambda (arg_count, body) ->
+     let* _ = emit_mkclosure p arg_count in
      Ok (Queue.push ((Dynarray.length p.instrs) - 1, body) p.backpatch)
   | If (test, t, f) ->
 (* *)
@@ -99,6 +99,10 @@ and compile_all p exprs =
     (fun e ->
       let* _ = compile_one p e in
       emit_instr p Pop) exprs
+and compile_all_no_pop p exprs =
+  Util.traverse
+    (fun e ->
+      let* _ = compile_one p e in Ok ()) exprs
 
 (* Once we have compiled the top-level expressions, we must now compile
    all of the lambdas we held off on. Some of these will hold more
@@ -106,9 +110,12 @@ and compile_all p exprs =
    of the backpatch queue. 
  *)
 let backpatch_one p (i, b) =
-  Dynarray.set p.instrs i (Instr (MakeClosure (current_index p)));
-  let* _ = compile_one p b in
-  emit_instr p End
+  match Dynarray.get p.instrs i with
+  | BackPatchMkClosure arg_count ->
+     Dynarray.set p.instrs i (Instr (MakeClosure (arg_count, current_index p)));
+     let* _ = compile_one p b in
+     emit_instr p End
+  | _ -> failwith "Can't backpatch anything other than a MakeClosure after compilation"
 let rec backpatch p =
   if Queue.is_empty p.backpatch then
     Ok ()
@@ -120,7 +127,7 @@ let rec backpatch p =
 let print_instr = function
   | Instr i -> Vm.Types.print_one i
   | BackPatchJumpF ->  "BACKPATCH JUMPF\n"
-  | BackPatchMkClosure -> "BACKPATCH CLOSURE\n"
+  | BackPatchMkClosure i -> "BACKPATCH CLOSURE \n" ^ (string_of_int i)
 let print_instrs =
   Array.mapi_inplace (fun i ins ->
     print_endline (Printf.sprintf "%d: %s" i (print_instr ins)); ins)
