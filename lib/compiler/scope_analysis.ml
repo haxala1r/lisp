@@ -61,7 +61,10 @@ let default_global_table =
       ("+", (1, Native 1));
       ("-", (2, Native 2));
       ("*", (3, Native 3));
-      ("/", (4, Native 4))
+      ("/", (4, Native 4));
+      ("ABS", (5, Native 5));
+      ("MOD", (6, Native 6));
+      ("REM", (7, Native 7))
     ]
 
 (* extract all defined global symbols, given the top-level expressions
