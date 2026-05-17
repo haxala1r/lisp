@@ -60,7 +60,8 @@ let default_global_table =
       ("PRINT", (0, Native 0));
       ("+", (1, Native 1));
       ("-", (2, Native 2));
-      ("*", (3, Native 3))
+      ("*", (3, Native 3));
+      ("/", (4, Native 4))
     ]
 
 (* extract all defined global symbols, given the top-level expressions
