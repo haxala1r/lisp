@@ -1,4 +1,3 @@
-let ( let* ) = Result.bind;;
 
 
 
@@ -7,10 +6,12 @@ let ( let* ) = Result.bind;;
 
 let rec interpret_loop () =
   let l  = read_line () in
-  let* vm = Compiler.Emit.compile_src l in
-  print_endline "=== PROGRAM DISASSEMBLY";
-  Vm.Types.print_instrs vm.instrs;
-  print_endline "=== PROGRAM OUTPUT";
-  Vm.interpret vm;
-  interpret_loop ()
+  let vm = Compiler.Emit.compile_src l in
+  match vm with
+  | Ok vm ->
+     print_endline "=== PROGRAM DISASSEMBLY";
+     Vm.Types.print_instrs vm.instrs;
+     print_endline "=== PROGRAM OUTPUT";
+     Vm.interpret vm; interpret_loop ()
+  | Error s -> print_endline s
 let _ = interpret_loop ()
