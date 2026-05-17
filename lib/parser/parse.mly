@@ -23,8 +23,8 @@ prog:
 expr:
   | i = INT { LInt i }
   | d = DOUBLE { LDouble d}
-  | s = SYM { LSymbol s }
-  | s = STR { LString (String.uppercase_ascii s) }
+  | s = SYM { LSymbol (String.uppercase_ascii s) }
+  | s = STR { LString s}
   | LPAREN; l = lisp_list_rest { l }
   | QUOTE; e = expr { LCons (LSymbol "quote", LCons (e, LNil)) }
 ;
