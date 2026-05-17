@@ -38,6 +38,9 @@ type expression =
   | If of expression * expression * expression
   | Set of variable * expression
   | Begin of expression list
+  | Native of int 
+(* Native is effectively a VM primitive. Emitted here for convenience. *)
+
 
 (* IMPORTANT:
    This is a predefined global table.
@@ -54,8 +57,8 @@ type expression =
  *)
 let default_global_table =
   SymbolTable.of_list [
-      ("print", 0);
-      ("add", 1)
+      ("print", (0, Native 0));
+      ("add", (1, Native 1))
     ]
 
 (* extract all defined global symbols, given the top-level expressions
@@ -72,7 +75,7 @@ let extract_globals (top : Core_ast.top_level list) =
   let rec aux tbl = function
     | [] -> tbl
     | Core_ast.Define (sym, _) :: rest ->
-       aux (SymbolTable.add sym (id ()) tbl) rest
+       aux (SymbolTable.add sym ((id ()), Literal Nil) tbl) rest
     | Expr _ :: rest ->
        aux tbl rest
   in aux default_global_table top
@@ -86,7 +89,7 @@ let extract_globals (top : Core_ast.top_level list) =
 
 let resolve_global tbl sym =
   match SymbolTable.find_opt sym tbl with
-  | Some x -> Ok (Global x)
+  | Some (x, _) -> Ok (Global x)
   | None -> Error ("symbol " ^ sym ^ " is not defined!")
 
 (* First we try to resolve it to a local symbol, then look it up in the
@@ -118,6 +121,39 @@ let extract_functions exprs =
   let fs = List.map Option.get fs in
   List.fold_left (fun t (s, args, rest) -> SymbolTable.add s (args, rest) t) SymbolTable.empty fs
 
+
+let rec analyze global_tbl =
+  let rec aux tbl current = function
+    | Core_ast.Literal s -> Ok (Literal s)
+    | Var sym -> resolve_var tbl current sym
+    | Set (sym, expr) ->
+       let* inner = analyze global_tbl tbl current expr in
+       resolve_set tbl current sym inner
+    | Lambda (args, rest, body) ->
+       let args = (match rest with
+                  | Some s -> List.append args [s]
+                  | None -> args) in
+       let* body = (aux global_tbl (args :: current) body) in
+       Ok (Lambda (List.length args, body))
+    | Apply (f, es) ->
+       let* f = aux tbl current f in
+       let* e = Util.traverse (aux tbl current) es in
+       Ok (Apply (f, e))
+    | If (test, pos, neg) ->
+       let* test = aux tbl current test in
+       let* pos = aux tbl current pos in
+       let* neg = aux tbl current neg in
+       Ok (If (test, pos, neg))
+    | Begin el ->
+       let* body = traverse (aux tbl current) el in
+       Ok (Begin body)
+  in aux
+
+let is_constantish = function
+  | Literal _ -> true
+  | Lambda _ -> true
+  | Native _ -> true
+  | _ -> false
 (* We need to do some more sophisticated analysis to detect cases where
    a symbol is accessed before it is defined.
    If a symbol is accessed in a lambda body, that is fine, since that computation
@@ -138,41 +174,24 @@ let extract_functions exprs =
    I may consider adding special support for let forms, as this is pretty annoying.
  *)
 let convert program =
-  let global_tbl = extract_globals program in
-  let rec analyze tbl current = function
-    | Core_ast.Literal s -> Ok (Literal s)
-    | Var sym -> resolve_var tbl current sym
-    | Set (sym, expr) ->
-       let* inner = analyze tbl current expr in
-       resolve_set tbl current sym inner
-    | Lambda (args, rest, body) ->
-       let args = (match rest with
-                  | Some s -> List.append args [s]
-                  | None -> args) in
-       let* body = (analyze global_tbl (args :: current) body) in
-       Ok (Lambda (List.length args, body))
-    | Apply (f, es) ->
-       let* f = analyze tbl current f in
-       let* e = Util.traverse (analyze tbl current) es in
-       Ok (Apply (f, e))
-    | If (test, pos, neg) ->
-       let* test = analyze tbl current test in
-       let* pos = analyze tbl current pos in
-       let* neg = analyze tbl current neg in
-       Ok (If (test, pos, neg))
-    | Begin el ->
-       let* body = traverse (analyze tbl current) el in
-       Ok (Begin body)
-  in
-  let[@tail_mod_cons] rec aux tbl = function
-    | [] -> []
-    | (Core_ast.Expr e) :: rest -> (analyze tbl [] e) :: (aux tbl rest)
+  let global_tbl = ref (extract_globals program) in
+  let rec aux tbl = function
+    | [] -> Ok []
+    | (Core_ast.Expr e) :: rest ->
+       let* analysis = (analyze !global_tbl tbl [] e) in
+       let* rest = aux tbl rest in
+       Ok (analysis :: rest)
     | (Define (s, e)) :: rest ->
-       let tbl = SymbolTable.add s (SymbolTable.find s global_tbl) tbl in
-       (analyze tbl [] (Set (s, e))) :: (aux tbl rest)
+       let (id, _) = SymbolTable.find s !global_tbl in
+       let* analysis = analyze !global_tbl tbl [] e in
+       global_tbl := SymbolTable.remove s !global_tbl;
+       global_tbl := SymbolTable.add s (id, analysis) !global_tbl;
+       let tbl = SymbolTable.add s (SymbolTable.find s !global_tbl) tbl in
+       let* rest = aux tbl rest in
+       if is_constantish analysis then Ok (rest) else Ok (analysis :: rest)
   in
-  let* program = traverse (fun x -> x) (aux default_global_table program) in
-  Ok (program, global_tbl)
+  let* program = (aux default_global_table program) in
+  Ok (program, !global_tbl)
 
 let of_src src =
   let* core = (Core_ast.of_src src) in

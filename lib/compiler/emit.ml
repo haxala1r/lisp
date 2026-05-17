@@ -5,6 +5,9 @@ module SymbolTable = Scope_analysis.SymbolTable
 
 type instr = Vm.Types.instr
 
+type pre_global =
+  | Global of Vm.Types.value
+  | BackPatchClosure
 type pre_instr =
   | Instr of instr
   | BackPatchMkClosure of int
@@ -13,11 +16,13 @@ type pre_instr =
 type program = {
     instrs : pre_instr Dynarray.t;
     constants : Vm.Types.value Dynarray.t;
+    globals : pre_global Dynarray.t;
     sym_table : int SymbolTable.t;
     (* This array holds the lambda bodies that we have to compiler later, and
        the index we have to patch the address back into.
      *)
     backpatch : (int * expression) Queue.t;
+    backpatch_const_q : (int * int * expression) Queue.t;
   }
 
 let ( let* ) = Result.bind
@@ -93,6 +98,8 @@ let rec compile_one p = function
      let* _ = compile_one p e1 in
      let* _ = emit_instr p Vm.Types.Pop in
      compile_one p (Begin (e2 :: rest))
+  | Native i ->
+     emit_constant p (Vm.Types.Native i)
 
 and compile_all p exprs =
   Util.traverse
@@ -109,19 +116,33 @@ and compile_all_no_pop p exprs =
    lambdas - that should be fine, they'll just get added to the end
    of the backpatch queue. 
  *)
-let backpatch_one p (i, b) =
+let backpatch_one_instr p (i, b) =
   match Dynarray.get p.instrs i with
   | BackPatchMkClosure arg_count ->
      Dynarray.set p.instrs i (Instr (MakeClosure (arg_count, current_index p)));
      let* _ = compile_one p b in
      emit_instr p End
   | _ -> failwith "Can't backpatch anything other than a MakeClosure after compilation"
-let rec backpatch p =
+let rec backpatch_instrs p =
   if Queue.is_empty p.backpatch then
     Ok ()
   else
-    (let* _ = backpatch_one p (Queue.pop p.backpatch) in
-     backpatch p)
+    (let* _ = backpatch_one_instr p (Queue.pop p.backpatch) in
+     backpatch_instrs p)
+let backpatch_one_const p (i, arg_count, b) =
+  let instr_loc = Dynarray.length p.instrs in
+  let* _ = compile_one p b in
+  let* _ = emit_instr p End in
+  Ok (Dynarray.set p.globals i (Global (Vm.Types.Closure (arg_count, instr_loc, []))))
+let rec backpatch_consts p =
+  if Queue.is_empty p.backpatch_const_q then
+    Ok ()
+  else
+    (let* _ = backpatch_one_const p (Queue.pop p.backpatch_const_q) in
+    backpatch_consts p)
+let backpatch p =
+  let* () = backpatch_instrs p in
+  backpatch_consts p
 
 
 let print_instr = function
@@ -131,24 +152,52 @@ let print_instr = function
 let print_instrs =
   Array.mapi_inplace (fun i ins ->
     print_endline (Printf.sprintf "%d: %s" i (print_instr ins)); ins)
-let smooth_one = function
+let smooth_one_instr = function
   | Instr i -> i
-  | _ -> failwith "backpatching process was not complete!"
+  | _ -> failwith "backpatching process was not complete! (instrs)"
 let smooth_instrs p =
-  Dynarray.to_array (Dynarray.map smooth_one p.instrs)
+  Dynarray.to_array (Dynarray.map smooth_one_instr p.instrs)
+let smooth_one_global = function
+  | Global c -> c
+  | _ -> failwith "backpatching process was not complete! (consts)"
+let smooth_globals p =
+  Dynarray.to_array (Dynarray.map smooth_one_global p.globals)
 
-let compile (exprs : expression list) (tbl : int SymbolTable.t) =
+let rec constantify = function
+  | Core_ast.Nil  -> Vm.Types.Nil
+  | Core_ast.Int x -> Vm.Types.Int x
+  | Core_ast.String s -> Vm.Types.String s
+  | Core_ast.Double x -> Vm.Types.Double x
+  | Core_ast.Cons (a, b) -> Vm.Types.Cons (constantify a, constantify b)
+  | Core_ast.Symbol s -> Vm.Types.Symbol s
+let mk_constants (tbl : (int * expression) SymbolTable.t) =
+  let constants = Dynarray.make ((SymbolTable.cardinal tbl) + 1) (Global Vm.Types.Nil) in
+  let to_backpatch = Queue.create () in
+  let () = SymbolTable.iter (fun _ (i, v) -> Dynarray.set constants i (match v with
+                                               | Scope_analysis.Lambda (a, b) -> Queue.add (i, a, b) to_backpatch; BackPatchClosure
+                                               | Scope_analysis.Literal l -> Global (constantify l)
+                                               | Native i -> Global (Vm.Types.Native i)
+                                               | _ -> Global Vm.Types.Nil)) tbl in
+  (constants, to_backpatch)
+  
+
+let compile (exprs : expression list) (tbl : (int * expression) SymbolTable.t) =
+  let (globals, backpatch_const_q) = mk_constants tbl in
   let program = {
       instrs=Dynarray.create ();
-      constants=Dynarray.create ();
-      sym_table=tbl;
+      constants=Dynarray.create();
+      globals=globals;
+      sym_table=SymbolTable.map (fun (a, _) -> a) tbl;
       backpatch=Queue.create ();
+      backpatch_const_q=backpatch_const_q;
     } in
   let* _ = compile_all program exprs in
   let* _ = emit_instr program End in
   let* _ = backpatch program in
   let final_instrs = smooth_instrs program in
-  Ok (Vm.make_vm final_instrs (Dynarray.to_array program.constants) ((SymbolTable.cardinal tbl) + 1))
+  let final_globals = smooth_globals program in
+  let () = print_endline "constants:"; Array.iter (fun v -> print_endline(Vm.Types.print_value v)) final_globals in
+  Ok (Vm.make_vm final_instrs (Dynarray.to_array program.constants) final_globals) (*((SymbolTable.cardinal tbl) + 1))*)
 
 let compile_src src =
   let* (exprs, tbl) = Scope_analysis.of_src src in
