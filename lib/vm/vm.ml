@@ -52,7 +52,7 @@ let rec do_apply state arg_count =
   | _ -> failwith "Cannot apply non-closure object"
 
 and interpret state =
-  (*trace state; (* For debug use *)*)
+  (*trace state; (*For debug use only*)*)
   let i = state.i in
   state.i <- i + 1;
   (match state.instrs.(i) with

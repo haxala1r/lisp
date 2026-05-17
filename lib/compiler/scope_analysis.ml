@@ -57,8 +57,8 @@ type expression =
  *)
 let default_global_table =
   SymbolTable.of_list [
-      ("print", (0, Native 0));
-      ("add", (1, Native 1))
+      ("PRINT", (0, Native 0));
+      ("ADD", (1, Native 1))
     ]
 
 (* extract all defined global symbols, given the top-level expressions

@@ -202,3 +202,4 @@ let compile (exprs : expression list) (tbl : (int * expression) SymbolTable.t) =
 let compile_src src =
   let* (exprs, tbl) = Scope_analysis.of_src src in
   compile exprs tbl
+
