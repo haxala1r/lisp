@@ -84,8 +84,8 @@ and interpret state =
         interpret state)
   | NOOP -> interpret state)
 
-let make_vm instrs constants global_count =
-  let globals = Array.init global_count (fun x -> if x < (Array.length Native.table) then Native x else Nil) in
+let make_vm instrs constants globals =
+  (*let globals = Array.init global_count (fun x -> if x < (Array.length Native.table) then Native x else Nil) in*)
   {
     i = 0;
     instrs = instrs;
