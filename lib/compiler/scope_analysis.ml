@@ -22,13 +22,14 @@ type variable =
    all symbol accesses are either referring to a local binding or a global one,
    and this is distinguished through the variable type above.
 
-   Lambda expressions are stripped of the symbol name of their single parameter.
-   This name is not needed at runtime, as all symbol accesses will be resolved
-   into an index into either the local scope linked list or the global symbol table.
+   Lambda expressions are stripped of the symbol names of their parameters,
+   just as variable accesses are stripped of their symbol names. All function
+   applications must create a stack frame with enough "cells" to contain
+   the arguments to a function.
 
-   Set is also split into its global and local versions, using the above variable type.
-
-   The rest aren't modified at all.
+   Tail calls can of course be eliminated by simply destroying the current
+   stack frame before constructing the stack frame of the next application
+   and not pushing a return address.
  *)
 type expression =
   | Literal of literal
@@ -74,8 +75,8 @@ let default_global_table =
    an index into a global array where the values of all global symbols will
    be kept at runtime.
  *)
-let extract_globals (top : Core_ast.top_level list) =
-  let id_counter = (ref (SymbolTable.cardinal default_global_table)) in
+let extract_globals default (top : Core_ast.top_level list) =
+  let id_counter = (ref (SymbolTable.cardinal default)) in
   let id () =
     id_counter := !id_counter + 1; !id_counter in
   let rec aux tbl = function
@@ -86,20 +87,21 @@ let extract_globals (top : Core_ast.top_level list) =
        aux tbl rest
   in aux default_global_table top
 
-(* The current lexical scope is simply a linked list of entries,
-   and each symbol access will be resolved as an access to an index
-   in this linked list. The symbol names are erased before runtime.
-   During this analysis we keep the lexical scope as a linked list of
-   symbols, and we find the index by traversing this linked list.
- *)
-
 let resolve_global tbl sym =
   match SymbolTable.find_opt sym tbl with
   | Some (x, _) -> Ok (Global x)
   | None -> Error ("symbol " ^ sym ^ " is not defined!")
 
-(* First we try to resolve it to a local symbol, then look it up in the
-   global table if we can't find it in the local environment
+(*
+  First we try to resolve it to a local symbol, then look it up in the
+  global table if we can't find it in the local environment.
+  This ensures proper lexical scoping.
+  Currently the lexical environment is simply a linked list of scopes,
+  where each scope is a linked list containing symbols.
+  In the runtime of course, this can be optimized into arrays/stack space
+  et cetera, however during symbol resolution we keep it simple.
+
+  If local resolution fails, we resolve it into a global value.
  *)
 let resolve_symbol tbl env sym =
   let rec aux counter env_num = function
@@ -160,6 +162,7 @@ let is_constantish = function
   | Lambda _ -> true
   | Native _ -> true
   | _ -> false
+
 (* We need to do some more sophisticated analysis to detect cases where
    a symbol is accessed before it is defined.
    If a symbol is accessed in a lambda body, that is fine, since that computation
@@ -179,8 +182,8 @@ let is_constantish = function
 
    I may consider adding special support for let forms, as this is pretty annoying.
  *)
-let convert program =
-  let global_tbl = ref (extract_globals program) in
+let convert global_tbl top_level =
+  let global_tbl = ref (extract_globals global_tbl top_level) in
   let rec aux tbl = function
     | [] -> Ok []
     | (Core_ast.Expr e) :: rest ->
@@ -196,9 +199,9 @@ let convert program =
        let* rest = aux tbl rest in
        if is_constantish analysis then Ok (rest) else Ok (analysis :: rest)
   in
-  let* program = (aux default_global_table program) in
+  let* program = (aux default_global_table top_level) in
   Ok (program, !global_tbl)
 
 let of_src src =
   let* core = (Core_ast.of_src src) in
-  convert core
+  convert default_global_table core
