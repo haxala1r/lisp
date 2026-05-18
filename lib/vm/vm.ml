@@ -2,8 +2,6 @@
 module Types = Types
 open Types
 
-module SymbolTable = Map.Make(String)
-
 
 let do_local state i f =
   match List.nth_opt state.env i with
@@ -96,4 +94,5 @@ let make_vm instrs constants globals =
     env = [];
     stack = [];
     call_stack = [];
+    symbols = SymbolTable.empty
   }

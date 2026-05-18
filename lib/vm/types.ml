@@ -1,3 +1,4 @@
+module SymbolTable = Map.Make(String)
 
 type value =
   | Int of int
@@ -35,6 +36,7 @@ type vm_state = {
     mutable env : value ref list;
     mutable stack : value list;
     mutable call_stack : (int * (value ref list)) list;
+    mutable symbols : int SymbolTable.t
   }
 
 

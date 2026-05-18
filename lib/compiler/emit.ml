@@ -7,6 +7,7 @@ type instr = Vm.Types.instr
 
 type pre_global =
   | Global of Vm.Types.value
+  | DontModify
   | BackPatchClosure
 type pre_instr =
   | Instr of instr
@@ -157,11 +158,15 @@ let smooth_one_instr = function
   | _ -> failwith "backpatching process was not complete! (instrs)"
 let smooth_instrs p =
   Dynarray.to_array (Dynarray.map smooth_one_instr p.instrs)
-let smooth_one_global = function
+let smooth_one_global (prev_vm : Vm.Types.vm_state option) i = function
   | Global c -> c
+  | DontModify ->
+     (match prev_vm with
+     | Some prev_vm -> prev_vm.globals.(i)
+     | None -> Nil)
   | _ -> failwith "backpatching process was not complete! (consts)"
-let smooth_globals p =
-  Dynarray.to_array (Dynarray.map smooth_one_global p.globals)
+let smooth_globals prev_vm p =
+  Dynarray.to_array (Dynarray.mapi (smooth_one_global prev_vm) p.globals)
 
 let rec constantify = function
   | Core_ast.Nil  -> Vm.Types.Nil
@@ -170,19 +175,24 @@ let rec constantify = function
   | Core_ast.Double x -> Vm.Types.Double x
   | Core_ast.Cons (a, b) -> Vm.Types.Cons (constantify a, constantify b)
   | Core_ast.Symbol s -> Vm.Types.Symbol s
-let mk_constants (tbl : (int * expression) SymbolTable.t) =
-  let constants = Dynarray.make ((SymbolTable.cardinal tbl) + 1) (Global Vm.Types.Nil) in
+let make_globals (tbl : (int * expression option) SymbolTable.t) =
+  let constants = Dynarray.make ((SymbolTable.cardinal tbl) + 1) (DontModify) in
   let to_backpatch = Queue.create () in
-  let () = SymbolTable.iter (fun _ (i, v) -> Dynarray.set constants i (match v with
-                                               | Scope_analysis.Lambda (a, b) -> Queue.add (i, a, b) to_backpatch; BackPatchClosure
-                                               | Scope_analysis.Literal l -> Global (constantify l)
-                                               | Native i -> Global (Vm.Types.Native i)
-                                               | _ -> Global Vm.Types.Nil)) tbl in
+  let () = SymbolTable.iter
+             (fun _ (i, v) ->
+               match v with
+               | Some v ->
+                  Dynarray.set constants i (match v with
+                    | Scope_analysis.Lambda (a, b) -> Queue.add (i, a, b) to_backpatch; BackPatchClosure
+                    | Scope_analysis.Literal l -> Global (constantify l)
+                    | Native i -> Global (Vm.Types.Native i)
+                    | _ -> Global Vm.Types.Nil)
+               | None -> ()) tbl in
   (constants, to_backpatch)
   
 
-let compile (exprs : expression list) (tbl : (int * expression) SymbolTable.t) =
-  let (globals, backpatch_const_q) = mk_constants tbl in
+let compile (prev_vm : Vm.Types.vm_state option) (exprs : expression list) (tbl : (int * expression option) SymbolTable.t) =
+  let (globals, backpatch_const_q) = make_globals tbl in
   let program = {
       instrs=Dynarray.create ();
       constants=Dynarray.create();
@@ -195,11 +205,10 @@ let compile (exprs : expression list) (tbl : (int * expression) SymbolTable.t) =
   let* _ = emit_instr program End in
   let* _ = backpatch program in
   let final_instrs = smooth_instrs program in
-  let final_globals = smooth_globals program in
+  let final_globals = smooth_globals prev_vm program in
   let () = print_endline "constants:"; Array.iter (fun v -> print_endline(Vm.Types.print_value v)) final_globals in
   Ok (Vm.make_vm final_instrs (Dynarray.to_array program.constants) final_globals) (*((SymbolTable.cardinal tbl) + 1))*)
 
 let compile_src src =
   let* (exprs, tbl) = Scope_analysis.of_src src in
-  compile exprs tbl
-
+  compile None exprs tbl

@@ -1,6 +1,6 @@
 
 
-module SymbolTable = Vm.SymbolTable
+module SymbolTable = Vm.Types.SymbolTable
 
 let ( let* ) = Result.bind
 let traverse = Util.traverse
@@ -78,14 +78,15 @@ let default_global_table =
 let extract_globals default (top : Core_ast.top_level list) =
   let id_counter = (ref (SymbolTable.cardinal default)) in
   let id () =
-    id_counter := !id_counter + 1; !id_counter in
+    (let i = !id_counter in
+    id_counter := !id_counter + 1; i) in
   let rec aux tbl = function
     | [] -> tbl
     | Core_ast.Define (sym, _) :: rest ->
-       aux (SymbolTable.add sym ((id ()), Literal Nil) tbl) rest
+       aux (SymbolTable.add sym ((id ()), None) tbl) rest
     | Expr _ :: rest ->
        aux tbl rest
-  in aux default_global_table top
+  in aux default top
 
 let resolve_global tbl sym =
   match SymbolTable.find_opt sym tbl with
@@ -182,8 +183,8 @@ let is_constantish = function
 
    I may consider adding special support for let forms, as this is pretty annoying.
  *)
-let convert global_tbl top_level =
-  let global_tbl = ref (extract_globals global_tbl top_level) in
+let convert default_global_table top_level =
+  let global_tbl = ref (extract_globals default_global_table top_level) in
   let rec aux tbl = function
     | [] -> Ok []
     | (Core_ast.Expr e) :: rest ->
@@ -194,7 +195,7 @@ let convert global_tbl top_level =
        let (id, _) = SymbolTable.find s !global_tbl in
        let* analysis = analyze !global_tbl tbl [] e in
        global_tbl := SymbolTable.remove s !global_tbl;
-       global_tbl := SymbolTable.add s (id, analysis) !global_tbl;
+       global_tbl := SymbolTable.add s (id, Some analysis) !global_tbl;
        let tbl = SymbolTable.add s (SymbolTable.find s !global_tbl) tbl in
        let* rest = aux tbl rest in
        if is_constantish analysis then Ok (rest) else Ok (analysis :: rest)
@@ -204,4 +205,11 @@ let convert global_tbl top_level =
 
 let of_src src =
   let* core = (Core_ast.of_src src) in
-  convert default_global_table core
+  let default = SymbolTable.map (fun (i, x) -> (i, Some x)) default_global_table in
+  convert default core
+
+
+let into_vm (vm : Vm.Types.vm_state) src =
+  let* core = (Core_ast.of_src src) in
+  let default = SymbolTable.map (fun i -> (i, None)) vm.symbols in
+  convert default core
