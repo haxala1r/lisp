@@ -92,7 +92,7 @@ let rec compile_one p = function
      set_instr p jump_index (Jump reunite_index);
      Ok ()
   | Begin [] ->
-     Error "Cannot compile empty begin "
+     emit_constant p Vm.Types.Nil
   | Begin (e1 :: []) ->
      compile_one p e1
   | Begin (e1 :: e2 :: rest) ->
@@ -202,7 +202,6 @@ let make_consts (prev_vm : Vm.Types.vm_state option) =
 
 let compile (prev_vm : Vm.Types.vm_state option) (exprs : expression list) (tbl : (int * expression option) SymbolTable.t) =
   let (globals, backpatch_const_q) = make_globals prev_vm tbl in
-  print_endline "h";
   let program = {
       instrs=make_instrs prev_vm;
       constants=make_consts prev_vm;
@@ -211,12 +210,12 @@ let compile (prev_vm : Vm.Types.vm_state option) (exprs : expression list) (tbl 
       backpatch=Queue.create ();
       backpatch_const_q=backpatch_const_q;
     } in
-  let* _ = compile_all program exprs in
+  let* _ = compile_one program (Begin exprs) in
   let* _ = emit_instr program End in
   let* _ = backpatch program in
   let final_instrs = smooth_instrs program in
   let final_globals = smooth_globals prev_vm program in
-  let () = print_endline "constants:"; Array.iter (fun v -> print_endline(Vm.Types.print_value v)) final_globals in
+  (*let () = print_endline "constants:"; Array.iter (fun v -> print_endline(Vm.Types.print_value v)) final_globals in*)
   Ok (final_instrs, (Dynarray.to_array program.constants), final_globals) (*((SymbolTable.cardinal tbl) + 1))*)
 
 let compile_src src =

@@ -75,8 +75,7 @@ and interpret state =
      | _ -> ()); interpret state 
   | End ->
      (match state.call_stack with
-     | [] ->
-        print_endline "\nPROGRAM HAS SUCCESSFULLY TERMINATED"
+     | [] -> ()
      | (old_i, old_env) :: rest ->
         state.call_stack <- rest;
         state.env <- old_env;
