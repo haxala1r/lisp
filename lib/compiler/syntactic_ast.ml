@@ -224,14 +224,14 @@ and apply f args =
   exp (Apply (f, args))
 
 and builtin_symbol = function
-  | "define" -> builtin_define
-  | "lambda" -> builtin_lambda
-  | "let" -> (make_builtin_let (fun x y -> Let (x,y)))
-  | "letrec" -> (make_builtin_let (fun x y -> LetRec (x,y)))
-  | "cond" -> builtin_cond
-  | "if" -> builtin_if
-  | "set!" -> builtin_set
-  | "quote" -> builtin_quote
+  | "DEFINE" -> builtin_define
+  | "LAMBDA" -> builtin_lambda
+  | "LET" -> (make_builtin_let (fun x y -> Let (x,y)))
+  | "LETREC" -> (make_builtin_let (fun x y -> LetRec (x,y)))
+  | "COND" -> builtin_cond
+  | "IF" -> builtin_if
+  | "SET!" -> builtin_set
+  | "QUOTE" -> builtin_quote
   | _ -> (function
        | LCons (f, args) -> apply f args
        | _ -> Error "Invalid function application!")

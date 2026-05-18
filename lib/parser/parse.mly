@@ -26,7 +26,7 @@ expr:
   | s = SYM { LSymbol (String.uppercase_ascii s) }
   | s = STR { LString s}
   | LPAREN; l = lisp_list_rest { l }
-  | QUOTE; e = expr { LCons (LSymbol "quote", LCons (e, LNil)) }
+  | QUOTE; e = expr { LCons (LSymbol "QUOTE", LCons (e, LNil)) }
 ;
 
 lisp_list_rest:
