@@ -75,14 +75,28 @@ let rec compile_one p = function
      let* _ = compile_all_no_pop p args in
      emit_instr p (Vm.Types.Add (List.length args))
   | Apply (Var (Intrinsic 2), args) ->
-     let* _ = compile_all_no_pop p args in
+     let* _ = compile_all_no_pop p (List.rev args) in
      emit_instr p (Vm.Types.Sub (List.length args))
   | Apply (Var (Intrinsic 3), args) ->
      let* _ = compile_all_no_pop p args in
      emit_instr p (Vm.Types.Mul (List.length args))
   | Apply (Var (Intrinsic 4), args) ->
-     let* _ = compile_all_no_pop p args in
-     emit_instr p (Vm.Types.Sub (List.length args))
+     let* _ = compile_all_no_pop p (List.rev args) in
+     emit_instr p (Vm.Types.Div (List.length args))
+  | Apply (Var (Intrinsic 5), x :: []) ->
+     let* _ = compile_one p x in
+     emit_instr p Vm.Types.Absolute
+  | Apply (Var (Intrinsic 5), xs) -> failwith ("invalid number of args for abs: " ^(string_of_int (List.length xs)))
+  | Apply (Var (Intrinsic 6), x :: y :: []) ->
+     let* _ = compile_one p x in
+     let* _ = compile_one p y in
+     emit_instr p Vm.Types.Modulo
+  | Apply (Var (Intrinsic 6), xs) -> failwith ("invalid number of args for mod: " ^(string_of_int (List.length xs)))
+  | Apply (Var (Intrinsic 7), x :: y :: []) ->
+     let* _ = compile_one p x in
+     let* _ = compile_one p y in
+     emit_instr p Vm.Types.Remainder
+  | Apply (Var (Intrinsic 7), xs) -> failwith ("invalid number of args for rem: " ^(string_of_int (List.length xs)))
   | Apply (Var (Intrinsic x), _) -> failwith ("unknown intrinsic: " ^ (string_of_int x))
   | Apply (f, args) ->
      let* _ = compile_one p f in

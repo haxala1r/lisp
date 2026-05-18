@@ -127,7 +127,23 @@ and interpret state =
        | x ->
           let one = (Native.to_numeric (pop_one state)) in
           aux (Native.numeric_div res one) (x-1) in
-     push state (Native.of_numeric (aux one (count-1))); interpret state)
+     push state (Native.of_numeric (aux one (count-1))); interpret state
+  | Absolute ->
+     let v = (match (pop_one state) with
+     | Int x -> Int (Int.abs x)
+     | Double x -> Double (Float.abs x)
+     | v -> failwith ("Cannot call abs on non-numeric value: " ^ (print_value v))) in
+     push state v ; interpret state
+  | Modulo ->
+     Native.(
+      let y = to_numeric (pop_one state) in
+      let x = to_numeric (pop_one state) in
+      push state (of_numeric (numeric_mod x y))); interpret state
+  | Remainder ->
+     Native.(
+      let y = to_numeric (pop_one state) in
+      let x = to_numeric (pop_one state) in
+      push state (of_numeric (numeric_rem x y))); interpret state)
 
 let make_vm instrs constants globals syms =
   (*let globals = Array.init global_count (fun x -> if x < (Array.length Native.table) then Native x else Nil) in*)

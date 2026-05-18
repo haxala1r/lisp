@@ -32,6 +32,9 @@ type instr =
   | Sub of int
   | Mul of int
   | Div of int
+  | Absolute
+  | Modulo
+  | Remainder
 
 
 type vm_state = {
@@ -77,6 +80,9 @@ let print_one = function
     | Sub i -> p "SUB %d\n" i
     | Mul i -> p "MUL %d\n" i
     | Div i -> p "DIV %d\n" i
+    | Absolute -> p "ABS\n"
+    | Modulo -> p "MOD\n"
+    | Remainder -> p "REM\n"
 
 let print_instrs instrs =  
   Array.mapi_inplace

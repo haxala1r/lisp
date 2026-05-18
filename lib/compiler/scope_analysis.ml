@@ -60,21 +60,17 @@ type expression =
 let default_global_table =
   SymbolTable.of_list [
       ("PRINT", (0, Native 0));
-(*      ("+", (1, Native 1));
-      ("-", (2, Native 2));
-      ("*", (3, Native 3));
-      ("/", (4, Native 4));*)
-      ("ABS", (1, Native 5));
-      ("MOD", (2, Native 6));
-      ("REM", (3, Native 7))
     ]
 
 let intrinsic_table =
   SymbolTable.of_list [
       ("+", 1);
       ("-", 2);
-      ("/", 3);
-      ("*", 4);
+      ("*", 3);
+      ("/", 4);
+      ("ABS", 5);
+      ("MOD", 6);
+      ("REM", 7);
     ]
 
 (* extract all defined global symbols, given the top-level expressions
