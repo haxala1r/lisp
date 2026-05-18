@@ -84,7 +84,7 @@ and interpret state =
         interpret state)
   | NOOP -> interpret state)
 
-let make_vm instrs constants globals =
+let make_vm instrs constants globals syms =
   (*let globals = Array.init global_count (fun x -> if x < (Array.length Native.table) then Native x else Nil) in*)
   {
     i = 0;
@@ -94,5 +94,5 @@ let make_vm instrs constants globals =
     env = [];
     stack = [];
     call_stack = [];
-    symbols = SymbolTable.empty
+    symbols = syms
   }

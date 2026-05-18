@@ -30,9 +30,9 @@ type instr =
 
 type vm_state = {
     mutable i : int;
-    instrs : instr array;
-    globals : value array;
-    constants : value array;
+    mutable instrs : instr array;
+    mutable globals : value array;
+    mutable constants : value array;
     mutable env : value ref list;
     mutable stack : value list;
     mutable call_stack : (int * (value ref list)) list;

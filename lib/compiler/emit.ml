@@ -175,27 +175,37 @@ let rec constantify = function
   | Core_ast.Double x -> Vm.Types.Double x
   | Core_ast.Cons (a, b) -> Vm.Types.Cons (constantify a, constantify b)
   | Core_ast.Symbol s -> Vm.Types.Symbol s
-let make_globals (tbl : (int * expression option) SymbolTable.t) =
-  let constants = Dynarray.make ((SymbolTable.cardinal tbl) + 1) (DontModify) in
+let make_globals (_prev_vm : Vm.Types.vm_state option) (tbl : (int * expression option) SymbolTable.t) =
+  let global_count = ((SymbolTable.cardinal tbl)) in 
+  let globals = Dynarray.make global_count DontModify in
   let to_backpatch = Queue.create () in
   let () = SymbolTable.iter
              (fun _ (i, v) ->
                match v with
                | Some v ->
-                  Dynarray.set constants i (match v with
+                  Dynarray.set globals i (match v with
                     | Scope_analysis.Lambda (a, b) -> Queue.add (i, a, b) to_backpatch; BackPatchClosure
                     | Scope_analysis.Literal l -> Global (constantify l)
                     | Native i -> Global (Vm.Types.Native i)
                     | _ -> Global Vm.Types.Nil)
                | None -> ()) tbl in
-  (constants, to_backpatch)
+  (globals, to_backpatch)
   
+let make_instrs (prev_vm : Vm.Types.vm_state option) =
+  match prev_vm with
+  | Some v -> Dynarray.of_array (Array.map (fun i -> Instr i) v.instrs)
+  | None -> Dynarray.create ()
+let make_consts (prev_vm : Vm.Types.vm_state option) =
+  match prev_vm with
+  | Some v -> Dynarray.of_array (v.constants)
+  | None -> Dynarray.create ()
 
 let compile (prev_vm : Vm.Types.vm_state option) (exprs : expression list) (tbl : (int * expression option) SymbolTable.t) =
-  let (globals, backpatch_const_q) = make_globals tbl in
+  let (globals, backpatch_const_q) = make_globals prev_vm tbl in
+  print_endline "h";
   let program = {
-      instrs=Dynarray.create ();
-      constants=Dynarray.create();
+      instrs=make_instrs prev_vm;
+      constants=make_consts prev_vm;
       globals=globals;
       sym_table=SymbolTable.map (fun (a, _) -> a) tbl;
       backpatch=Queue.create ();
@@ -207,8 +217,17 @@ let compile (prev_vm : Vm.Types.vm_state option) (exprs : expression list) (tbl 
   let final_instrs = smooth_instrs program in
   let final_globals = smooth_globals prev_vm program in
   let () = print_endline "constants:"; Array.iter (fun v -> print_endline(Vm.Types.print_value v)) final_globals in
-  Ok (Vm.make_vm final_instrs (Dynarray.to_array program.constants) final_globals) (*((SymbolTable.cardinal tbl) + 1))*)
+  Ok (final_instrs, (Dynarray.to_array program.constants), final_globals) (*((SymbolTable.cardinal tbl) + 1))*)
 
 let compile_src src =
   let* (exprs, tbl) = Scope_analysis.of_src src in
-  compile None exprs tbl
+  let* (is, cs, gs) = (compile None exprs tbl) in
+  Ok (Vm.make_vm is cs gs (SymbolTable.map (fun (i, _) -> i) tbl))
+
+let compile_src_into_vm vm src =
+  let* (exprs, tbl) = Scope_analysis.of_src_into_vm vm src in
+  let i = Array.length vm.instrs in
+  let* (is, cs, gs) = compile (Some vm) exprs tbl in
+  vm.i <- i; vm.instrs <- is; vm.constants <- cs ; vm.globals <- gs;
+  vm.symbols <- (SymbolTable.map (fun (i, _) -> i) tbl);
+  Ok (vm)

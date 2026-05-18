@@ -209,7 +209,7 @@ let of_src src =
   convert default core
 
 
-let into_vm (vm : Vm.Types.vm_state) src =
+let of_src_into_vm (vm : Vm.Types.vm_state) src =
   let* core = (Core_ast.of_src src) in
   let default = SymbolTable.map (fun i -> (i, None)) vm.symbols in
   convert default core
