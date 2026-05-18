@@ -2,6 +2,8 @@
 module Types = Types
 open Types
 
+module SymbolTable = Map.Make(String)
+
 
 let do_local state i f =
   match List.nth_opt state.env i with

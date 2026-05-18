@@ -1,6 +1,6 @@
 
 
-module SymbolTable = Map.Make(String);;
+module SymbolTable = Vm.SymbolTable
 
 let ( let* ) = Result.bind
 let traverse = Util.traverse
