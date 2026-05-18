@@ -17,6 +17,7 @@ type literal = Core_ast.literal
 type variable =
   | Local of int
   | Global of int
+  | Intrinsic of int
 
 (* Note:
    all symbol accesses are either referring to a local binding or a global one,
@@ -39,7 +40,7 @@ type expression =
   | If of expression * expression * expression
   | Set of variable * expression
   | Begin of expression list
-  | Native of int 
+  | Native of int
 (* Native is effectively a VM primitive. Emitted here for convenience. *)
 
 
@@ -59,13 +60,21 @@ type expression =
 let default_global_table =
   SymbolTable.of_list [
       ("PRINT", (0, Native 0));
-      ("+", (1, Native 1));
+(*      ("+", (1, Native 1));
       ("-", (2, Native 2));
       ("*", (3, Native 3));
-      ("/", (4, Native 4));
-      ("ABS", (5, Native 5));
-      ("MOD", (6, Native 6));
-      ("REM", (7, Native 7))
+      ("/", (4, Native 4));*)
+      ("ABS", (1, Native 5));
+      ("MOD", (2, Native 6));
+      ("REM", (3, Native 7))
+    ]
+
+let intrinsic_table =
+  SymbolTable.of_list [
+      ("+", 1);
+      ("-", 2);
+      ("/", 3);
+      ("*", 4);
     ]
 
 (* extract all defined global symbols, given the top-level expressions
@@ -83,6 +92,9 @@ let extract_globals default (top : Core_ast.top_level list) =
   let rec aux tbl = function
     | [] -> tbl
     | Core_ast.Define (sym, _) :: rest ->
+       if Option.is_some (SymbolTable.find_opt sym intrinsic_table) then
+         failwith ("scope_analysis: Cannot redefine intrinsic "^sym^"!")
+       else
        aux (SymbolTable.add sym ((id ()), None) tbl) rest
     | Expr _ :: rest ->
        aux tbl rest
@@ -91,7 +103,10 @@ let extract_globals default (top : Core_ast.top_level list) =
 let resolve_global tbl sym =
   match SymbolTable.find_opt sym tbl with
   | Some (x, _) -> Ok (Global x)
-  | None -> Error ("symbol " ^ sym ^ " is not defined!")
+  | None ->
+     match SymbolTable.find_opt sym intrinsic_table with
+     | Some i -> Ok (Intrinsic i)
+     | None -> Error ("symbol " ^ sym ^ " is not defined!")
 
 (*
   First we try to resolve it to a local symbol, then look it up in the

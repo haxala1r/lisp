@@ -62,12 +62,28 @@ let rec compile_one p = function
      emit_instr p (Vm.Types.LoadLocal i)
   | Var (Global i) ->
      emit_instr p (Vm.Types.LoadGlobal i)
+  | Var (Intrinsic i) ->
+     emit_constant p (Vm.Types.Native i)
   | Set (Local i, expr) ->
      let* _ = compile_one p expr in
      emit_instr p (Vm.Types.StoreLocal i)
   | Set (Global i, expr) ->
      let* _ = compile_one p expr in
      emit_instr p (Vm.Types.StoreGlobal i)
+  | Set (Intrinsic _, _) -> failwith "emit: Cannot set! intrinsics!"
+  | Apply (Var (Intrinsic 1), args) ->
+     let* _ = compile_all_no_pop p args in
+     emit_instr p (Vm.Types.Add (List.length args))
+  | Apply (Var (Intrinsic 2), args) ->
+     let* _ = compile_all_no_pop p args in
+     emit_instr p (Vm.Types.Sub (List.length args))
+  | Apply (Var (Intrinsic 3), args) ->
+     let* _ = compile_all_no_pop p args in
+     emit_instr p (Vm.Types.Mul (List.length args))
+  | Apply (Var (Intrinsic 4), args) ->
+     let* _ = compile_all_no_pop p args in
+     emit_instr p (Vm.Types.Sub (List.length args))
+  | Apply (Var (Intrinsic x), _) -> failwith ("unknown intrinsic: " ^ (string_of_int x))
   | Apply (f, args) ->
      let* _ = compile_one p f in
      let* _ = compile_all_no_pop p args in
@@ -76,7 +92,7 @@ let rec compile_one p = function
      let* _ = emit_mkclosure p arg_count in
      Ok (Queue.push ((Dynarray.length p.instrs) - 1, body) p.backpatch)
   | If (test, t, f) ->
-(* *)
+     (* *)
      let* _ = compile_one p test in (* compile the expression to be tested *)
      let jumpf_index = current_index p in
      let* _ = emit_jumpf p in (* jump if false, to the false branch*)
@@ -87,7 +103,7 @@ let rec compile_one p = function
      let* _ = compile_one p f in (* false branch *)
      let reunite_index = current_index p in
      let* _ = emit_instr p NOOP in
-(* Now we can immediately backpatch the dummy instructions we put in place *)
+     (* Now we can immediately backpatch the dummy instructions we put in place *)
      set_instr p jumpf_index (JumpF false_index);
      set_instr p jump_index (Jump reunite_index);
      Ok ()
