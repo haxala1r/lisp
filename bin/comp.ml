@@ -26,9 +26,7 @@ let interpret_loop () =
   match vm with
   | Ok vm ->
      Vm.interpret vm; print_endline (Vm.Types.print_value (Vm.pop_one vm));
-     (if debug then
-       Vm.Types.print_instrs vm.instrs
-     else ());
+     maybe_debug vm;
      interpret_cont vm
   | Error s -> print_endline s
 let _ = interpret_loop ()
