@@ -61,10 +61,6 @@ and interpret state =
   | LoadGlobal x -> push state state.globals.(x) ; interpret state
   | StoreLocal x -> set_local state x (peek_one state) ; interpret state
   | StoreGlobal x -> Array.set state.globals x (peek_one state) ; interpret state
-  | MakeCons ->
-     let cdr = pop_one state in
-     let car = pop_one state in
-     push state (Cons (car, cdr))
   | Pop -> ignore (pop_one state) ; interpret state
   | Apply a -> do_apply state a
   | MakeClosure (args, x) -> push state (Closure (args, x, state.env)); interpret state
@@ -124,7 +120,33 @@ and interpret state =
      Native.(
       let y = to_numeric (pop_one state) in
       let x = to_numeric (pop_one state) in
-      push state (of_numeric (numeric_rem x y))); interpret state)
+      push state (of_numeric (numeric_rem x y))); interpret state
+  | Cons ->
+     let car = pop_one state in
+     let cdr = pop_one state in
+     push state (Cons (ref car, ref cdr)); interpret state
+  | Car ->
+     let cons = pop_one state in
+     (match cons with
+     | Cons (car, _) -> push state !car ; interpret state
+     | _ -> failwith ("Can't get car of non-cons object: " ^ (print_value cons)) )
+  | Cdr ->
+     let cons = pop_one state in
+     (match cons with
+     | Cons (_, cdr) -> push state !cdr ; interpret state
+     | _ -> failwith ("Can't get cdr of non-cons object: " ^ (print_value cons)) )
+  | SetCar ->
+     let v = pop_one state in
+     let cons = pop_one state in
+     (match cons with
+     | Cons (car, _) -> push state v ; car := v ; interpret state
+     | _ -> failwith ("Can't set car of non-cons object: " ^ (print_value cons)) )
+  | SetCdr -> 
+     let v = pop_one state in
+     let cons = pop_one state in
+     (match cons with
+     | Cons (_, cdr) -> push state v ; cdr := v ; interpret state
+     | _ -> failwith ("Can't set car of non-cons object: " ^ (print_value cons)) ))
 
 let make_vm instrs constants globals syms =
   (*let globals = Array.init global_count (fun x -> if x < (Array.length Native.table) then Native x else Nil) in*)

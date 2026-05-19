@@ -62,12 +62,12 @@ and compile_one p = function
   | Scope_analysis.Literal (Int x) -> emit_constant p (Vm.Types.Int x)
   | Literal Nil -> emit_constant p (Vm.Types.Nil)
   | Literal (Double x) -> emit_constant p (Vm.Types.Double x)
-  | Literal (String s) -> emit_constant p (Vm.Types.String s)
+  | Literal (String s) -> emit_constant p (Vm.Types.String (ref s))
   | Literal (Symbol s) -> emit_constant p (Vm.Types.Symbol s)
   | Literal (Cons (a, b)) ->
      let* _ = compile_one p (Literal a) in
      let* _ = compile_one p (Literal b) in
-     emit_instr p (Vm.Types.MakeCons)
+     emit_instr p (Vm.Types.Cons)
   | Var (Scope_analysis.Local i) ->
      emit_instr p (Vm.Types.LoadLocal i)
   | Var (Global i) ->
@@ -219,9 +219,9 @@ let smooth_globals prev_vm p =
 let rec constantify = function
   | Core_ast.Nil  -> Vm.Types.Nil
   | Core_ast.Int x -> Vm.Types.Int x
-  | Core_ast.String s -> Vm.Types.String s
+  | Core_ast.String s -> Vm.Types.String (ref s)
   | Core_ast.Double x -> Vm.Types.Double x
-  | Core_ast.Cons (a, b) -> Vm.Types.Cons (constantify a, constantify b)
+  | Core_ast.Cons (a, b) -> Vm.Types.Cons (ref (constantify a), ref (constantify b))
   | Core_ast.Symbol s -> Vm.Types.Symbol s
 let make_globals (_prev_vm : Vm.Types.vm_state option) (tbl : (int * expression option) SymbolTable.t) =
   let global_count = ((SymbolTable.cardinal tbl)) in 

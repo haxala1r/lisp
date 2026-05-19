@@ -3,9 +3,9 @@ module SymbolTable = Map.Make(String)
 type value =
   | Int of int
   | Double of float
-  | String of string
+  | String of string ref
   | Nil
-  | Cons of value * value
+  | Cons of value ref * value ref
   | Symbol of string
   | Closure of int * int * value ref list
   | Native of int (* This is basically a syscall, each ID represents a primitive operation
@@ -19,7 +19,6 @@ type instr =
   | LoadGlobal of int
   | StoreLocal of int
   | StoreGlobal of int
-  | MakeCons
   | Pop (* discards top of stack *)
   | Apply of int (* arg count *)
   | MakeClosure of int * int (* arg count, code pointer *)
@@ -36,6 +35,12 @@ type instr =
   | Absolute
   | Modulo
   | Remainder
+  (* List operations *)
+  | Cons
+  | Car
+  | Cdr
+  | SetCar
+  | SetCdr
 
 
 type vm_state = {
@@ -55,9 +60,9 @@ let p = Printf.sprintf
 let rec print_value = function
     | Int x -> p "%d" x
     | Double x -> p "%f" x
-    | String x -> p "\"%s\"" x
+    | String x -> p "\"%s\"" !x
     | Nil -> p "'()"
-    | Cons (a, b) -> p "(%s . %s)" (print_value a) (print_value b)
+    | Cons (a, b) -> p "(%s . %s)" (print_value !a) (print_value !b)
     | Symbol x -> p "'%s" x
     | Closure (a, i, _) -> p "<closure of %d args at %d>" a i
     | Native i -> p "<native %d>" i
@@ -69,7 +74,6 @@ let print_one = function
     | LoadGlobal i -> p "GLOBAL %d\n" i
     | StoreLocal i -> p "STORE_LOCAL %d\n" i
     | StoreGlobal i -> p "STORE_GLOBAL %d\n" i
-    | MakeCons -> p "CONS\n"
     | Pop -> p "POP\n"
     | Apply i -> p "APPLY %d\n" i
     | MakeClosure (a, i) -> p "MKCLOSURE %d, %d\n" a i
@@ -77,6 +81,7 @@ let print_one = function
     | JumpF i -> p "JMPF %d\n" i
     | End -> p "END\n"
     | NOOP -> p "NOOP\n"
+    (* Math *)
     | Add -> p "ADD\n"
     | Sub -> p "SUB\n"
     | Negate -> p "NEGATE\n"
@@ -85,6 +90,12 @@ let print_one = function
     | Absolute -> p "ABS\n"
     | Modulo -> p "MOD\n"
     | Remainder -> p "REM\n"
+    (* List *)
+    | Cons -> p "CONS\n"
+    | Car -> p "CAR\n"
+    | Cdr -> p "CDR\n"
+    | SetCar -> p "SET-CAR!\n"
+    | SetCdr -> p "SET-CDR!\n"
 
 let print_instrs instrs =  
   Array.mapi_inplace
