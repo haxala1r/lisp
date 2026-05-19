@@ -40,11 +40,11 @@ let rec do_apply state arg_count =
   let args = pop_args state arg_count in
   let f = pop_one state in
   match f with
-  | Closure (a, _, _) when a != arg_count -> failwith "Wrong argument count to function"
-  | Closure (_, x, e) ->
+  | Closure c when c.fixed_arity > arg_count -> failwith "arity error"
+  | Closure c ->
      state.call_stack <- (cur_i, cur_env) :: state.call_stack;
-     state.i <- x;
-     state.env <- List.append args e;
+     state.i <- c.code_index;
+     state.env <- List.append args c.env;
      interpret state
   | Native x ->
      push state (Native.table.(x) args);
@@ -63,7 +63,9 @@ and interpret state =
   | StoreGlobal x -> Array.set state.globals x (peek_one state) ; interpret state
   | Pop -> ignore (pop_one state) ; interpret state
   | Apply a -> do_apply state a
-  | MakeClosure (args, x) -> push state (Closure (args, x, state.env)); interpret state
+  | MakeClosure (fixed_arity, code_index) ->
+     let c = Closure {fixed_arity=fixed_arity; is_variadic=false; code_index=code_index; env=state.env} in
+     push state c; interpret state
   | Jump target -> state.i <- target ; interpret state
   | JumpF target ->
      (match (pop_one state) with
@@ -146,7 +148,19 @@ and interpret state =
      let cons = pop_one state in
      (match cons with
      | ConsCell (_, cdr) -> push state v ; cdr := v ; interpret state
-     | _ -> failwith ("Can't set car of non-cons object: " ^ (print_value cons)) ))
+     | _ -> failwith ("Can't set car of non-cons object: " ^ (print_value cons)) )
+  | IsNil ->
+     (match pop_one state with
+     | Nil -> push state (Symbol "T")
+     | _ -> push state Nil); interpret state
+  | IsCons ->
+     (match pop_one state with
+     | ConsCell _ -> push state (Symbol "T")
+     | _ -> push state Nil); interpret state
+  | IsSymbol ->
+     (match pop_one state with
+     | Symbol _ -> push state (Symbol "T")
+     | _ -> push state Nil); interpret state)
 
 let make_vm instrs constants globals syms =
   (*let globals = Array.init global_count (fun x -> if x < (Array.length Native.table) then Native x else Nil) in*)

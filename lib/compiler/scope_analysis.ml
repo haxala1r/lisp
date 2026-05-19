@@ -75,7 +75,14 @@ let intrinsic_table =
       ("CAR", 9);
       ("CDR", 10);
       ("SET-CAR!", 11);
-      ("SET-CDR!", 12)
+      ("SET-CDR!", 12);
+      ("NIL?", 13);
+      ("CONS?", 14);
+      ("SYMBOL?", 15);
+      ("STRING?", 16);
+      ("CLOSURE?", 17);
+      ("NUMBER?", 18);
+      ("EQ?", 19);
     ]
 
 (* extract all defined global symbols, given the top-level expressions

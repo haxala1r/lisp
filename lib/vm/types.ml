@@ -7,7 +7,7 @@ type value =
   | Nil
   | ConsCell of value ref * value ref
   | Symbol of string
-  | Closure of int * int * value ref list
+  | Closure of { fixed_arity : int; is_variadic : bool; code_index : int; env : value ref list }
   | Native of int (* This is basically a syscall, each ID represents a primitive operation
                      that should have a well-defined effect. These will be further detailed
                      in the language documentation
@@ -41,7 +41,10 @@ type instr =
   | Cdr
   | SetCar
   | SetCdr
-
+  (* Predicates *)
+  | IsNil
+  | IsCons
+  | IsSymbol
 
 type vm_state = {
     mutable i : int;
@@ -55,6 +58,9 @@ type vm_state = {
   }
 
 
+let make_global_closure arity code =
+  Closure {fixed_arity = arity; is_variadic=false; code_index=code; env=[]}
+
 let p = Printf.sprintf 
 
 let rec print_value = function
@@ -64,7 +70,11 @@ let rec print_value = function
     | Nil -> p "'()"
     | ConsCell (a, b) -> p "(%s . %s)" (print_value !a) (print_value !b)
     | Symbol x -> p "'%s" x
-    | Closure (a, i, _) -> p "<closure of %d args at %d>" a i
+    | Closure c ->
+       p "<closure of %d%s args at %d>"
+         c.fixed_arity
+         (if c.is_variadic then " (or more)" else "")
+         c.code_index
     | Native i -> p "<native %d>" i
 
 
@@ -96,6 +106,11 @@ let print_one = function
     | Cdr -> p "CDR\n"
     | SetCar -> p "SET-CAR!\n"
     | SetCdr -> p "SET-CDR!\n"
+    (* Predicates *)
+    | IsNil -> p "NIL?\n"
+    | IsCons -> p "CONS?\n"
+    | IsSymbol -> p "SYMBOL?\n"
+
 
 let print_instrs instrs =  
   Array.mapi_inplace

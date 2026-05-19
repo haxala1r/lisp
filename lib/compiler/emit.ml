@@ -52,6 +52,12 @@ let rec binary_helper p ins = function
      let* _ = emit_instr p ins in
      binary_helper p ins rest
 
+and unary_helper name p ins = function
+  | arg :: [] ->
+     let* _ = compile_one p arg in
+     emit_instr p ins
+  | args -> failwith ("invalid number of arguments to " ^ name ^ " " ^ (string_of_int (List.length args)))
+
 (* evaluating an expression ALWAYS has the effect of pushing exactly
    one element to the stack. For top-level items, this element is
    silently popped.
@@ -138,6 +144,9 @@ and compile_one p = function
      let* _ = compile_one p cdr in
      emit_instr p Vm.Types.SetCdr
   | Apply (Var (Intrinsic 12), _) -> failwith "invalid arguments to set-cdr!"
+  | Apply (Var (Intrinsic 13), args) -> unary_helper "nil?" p Vm.Types.IsNil args
+  | Apply (Var (Intrinsic 14), args) -> unary_helper "cons?" p Vm.Types.IsCons args
+  | Apply (Var (Intrinsic 15), args) -> unary_helper "symbol?" p Vm.Types.IsSymbol args
   | Apply (Var (Intrinsic x), _) -> failwith ("unknown intrinsic: " ^ (string_of_int x))
   | Apply (f, args) ->
      let* _ = compile_one p f in
@@ -205,7 +214,7 @@ let backpatch_one_const p (i, arg_count, b) =
   let instr_loc = Dynarray.length p.instrs in
   let* _ = compile_one p b in
   let* _ = emit_instr p End in
-  Ok (Dynarray.set p.globals i (Global (Vm.Types.Closure (arg_count, instr_loc, []))))
+  Ok (Dynarray.set p.globals i (Global (Vm.Types.make_global_closure arg_count instr_loc)))
 let rec backpatch_consts p =
   if Queue.is_empty p.backpatch_const_q then
     Ok ()
