@@ -27,11 +27,12 @@ type instr =
   | JumpF of int (* jump if false. *)
   | End
   | NOOP
-  (* Arithmetic... and other math. Some take an arg count *)
-  | Add of int
-  | Sub of int
-  | Mul of int
-  | Div of int
+  (* Arithmetic... and other math. *)
+  | Add
+  | Sub
+  | Negate
+  | Mul
+  | Div
   | Absolute
   | Modulo
   | Remainder
@@ -76,10 +77,11 @@ let print_one = function
     | JumpF i -> p "JMPF %d\n" i
     | End -> p "END\n"
     | NOOP -> p "NOOP\n"
-    | Add i -> p "ADD %d\n" i
-    | Sub i -> p "SUB %d\n" i
-    | Mul i -> p "MUL %d\n" i
-    | Div i -> p "DIV %d\n" i
+    | Add -> p "ADD\n"
+    | Sub -> p "SUB\n"
+    | Negate -> p "NEGATE\n"
+    | Mul -> p "MUL\n"
+    | Div -> p "DIV\n"
     | Absolute -> p "ABS\n"
     | Modulo -> p "MOD\n"
     | Remainder -> p "REM\n"

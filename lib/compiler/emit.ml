@@ -44,11 +44,21 @@ let emit_instr p i =
 let emit_constant p c =
   Dynarray.add_last p.constants c;
   emit_instr p (Constant ((Dynarray.length p.constants) - 1))
+
+let rec binary_helper p ins = function
+  | [] -> Ok ()
+  | a :: rest ->
+     let* _ = compile_one p a in
+     let* _ = emit_instr p ins in
+     binary_helper p ins rest
+
 (* evaluating an expression ALWAYS has the effect of pushing exactly
    one element to the stack. For top-level items, this element is
    silently popped.
+   Except for the last top-level form, so that it may be popped by
+   the REPL and printed.
  *)
-let rec compile_one p = function
+and compile_one p = function
   | Scope_analysis.Literal (Int x) -> emit_constant p (Vm.Types.Int x)
   | Literal Nil -> emit_constant p (Vm.Types.Nil)
   | Literal (Double x) -> emit_constant p (Vm.Types.Double x)
@@ -71,18 +81,26 @@ let rec compile_one p = function
      let* _ = compile_one p expr in
      emit_instr p (Vm.Types.StoreGlobal i)
   | Set (Intrinsic _, _) -> failwith "emit: Cannot set! intrinsics!"
-  | Apply (Var (Intrinsic 1), args) ->
-     let* _ = compile_all_no_pop p args in
-     emit_instr p (Vm.Types.Add (List.length args))
-  | Apply (Var (Intrinsic 2), args) ->
-     let* _ = compile_all_no_pop p (List.rev args) in
-     emit_instr p (Vm.Types.Sub (List.length args))
-  | Apply (Var (Intrinsic 3), args) ->
-     let* _ = compile_all_no_pop p args in
-     emit_instr p (Vm.Types.Mul (List.length args))
-  | Apply (Var (Intrinsic 4), args) ->
-     let* _ = compile_all_no_pop p (List.rev args) in
-     emit_instr p (Vm.Types.Div (List.length args))
+  | Apply (Var (Intrinsic 1), []) -> emit_constant p (Int 0)
+  | Apply (Var (Intrinsic 1), one :: args) ->
+     let* _ = compile_one p one in
+     binary_helper p Vm.Types.Add args
+  | Apply (Var (Intrinsic 2), []) -> failwith "cannot apply '- to zero arguments"
+  | Apply (Var (Intrinsic 2), single :: []) ->
+     let* _ = compile_one p single in
+     emit_instr p Vm.Types.Negate
+  | Apply (Var (Intrinsic 2), one :: args) ->
+     let* _ = compile_one p one in
+     binary_helper p Vm.Types.Sub args
+  | Apply (Var (Intrinsic 3), []) -> emit_constant p (Int 1)
+  | Apply (Var (Intrinsic 3), one :: args) ->
+     let* _ = compile_one p one in
+     binary_helper p Vm.Types.Mul args
+  | Apply (Var (Intrinsic 4), []) -> failwith "cannot apply '/ to zero arguments"
+  | Apply (Var (Intrinsic 4), one :: []) -> compile_one p (Apply (Var (Intrinsic 4), (Literal (Int 1)) :: one :: []))
+  | Apply (Var (Intrinsic 4), one :: args) ->
+     let* _ = compile_one p one in
+     binary_helper p Vm.Types.Div args
   | Apply (Var (Intrinsic 5), x :: []) ->
      let* _ = compile_one p x in
      emit_instr p Vm.Types.Absolute

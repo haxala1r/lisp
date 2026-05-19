@@ -82,52 +82,33 @@ and interpret state =
         state.i <- old_i;
         interpret state)
   | NOOP -> interpret state
-  | Add count ->
-     let rec aux sum = function
-       | 0 -> sum
-       | x ->
-          let one = pop_one state in
-          aux (Native.numeric_add sum (Native.to_numeric one)) (x-1) in
-     push state (Native.of_numeric (aux (Native.NInt 0) count)); interpret state
-  | Sub 0 -> failwith ("instruction at index "^(string_of_int state.i)^ ": cannot call '-' on zero args")
-  | Sub 1 ->
+  | Add ->
+     Native.(
+      let x = to_numeric (pop_one state) in
+      let y = to_numeric (pop_one state) in
+      push state (of_numeric (numeric_add x y)); interpret state)
+  | Negate ->
      let one = pop_one state in
      let one = (match one with
                | Int x -> Int (Int.neg x)
                | Double x -> Double (Float.neg x)
-               | _ -> failwith ("cannot subtract non-numeric value: " ^ (print_value one))) in
+               | _ -> failwith ("cannot negate non-numeric value: " ^ (print_value one))) in
      push state one; interpret state
-  | Sub x ->
-     let one = Native.to_numeric (pop_one state) in
-     let rec aux res = function
-       | 0 -> res
-       | x ->
-          let one = (Native.to_numeric (pop_one state)) in
-          aux (Native.numeric_sub res one) (x-1) in
-     push state (Native.of_numeric (aux one (x-1))); interpret state
-  | Mul count ->
-     let rec aux sum = function
-       | 0 -> sum
-       | x ->
-          let one = pop_one state in
-          aux (Native.numeric_mul sum (Native.to_numeric one)) (x-1) in
-     push state (Native.of_numeric (aux (Native.NInt 1) count)); interpret state
-  | Div 0 -> failwith ("instruction at index "^(string_of_int state.i)^ ": cannot call '/' on zero args")
-  | Div 1 ->
-     let one = pop_one state in
-     let one = (match one with
-               | Int x -> Double (1. /. (float_of_int x))
-               | Double x -> Double (1. /. x)
-               | _ -> failwith ("cannot divide non-numeric value: " ^ (print_value one))) in
-     push state one; interpret state
-  | Div count ->
-     let one = Native.to_numeric (pop_one state) in
-     let rec aux res = function
-       | 0 -> res
-       | x ->
-          let one = (Native.to_numeric (pop_one state)) in
-          aux (Native.numeric_div res one) (x-1) in
-     push state (Native.of_numeric (aux one (count-1))); interpret state
+  | Sub ->
+     Native.(
+      let y = to_numeric (pop_one state) in
+      let x = to_numeric (pop_one state) in
+      push state (of_numeric (numeric_sub x y)); interpret state)
+  | Mul ->
+     Native.(
+      let x = to_numeric (pop_one state) in
+      let y = to_numeric (pop_one state) in
+      push state (of_numeric (numeric_mul x y)); interpret state)
+  | Div ->
+     Native.(
+      let y = to_numeric (pop_one state) in
+      let x = to_numeric (pop_one state) in
+      push state (of_numeric (numeric_div x y)); interpret state)
   | Absolute ->
      let v = (match (pop_one state) with
      | Int x -> Int (Int.abs x)
