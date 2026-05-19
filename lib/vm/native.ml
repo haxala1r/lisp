@@ -88,6 +88,10 @@ let builtin_mod =
 let builtin_rem =
   make_two_func "REM" (fun x y -> of_numeric (numeric_rem (to_numeric !x) (to_numeric !y)))
 
+let builtin_cons = function
+  | car :: cdr :: [] -> ConsCell (ref car, ref cdr)
+  | _ -> failwith ("can't apply cons")
+
 let table = [|
     builtin_print;
     builtin_add;
@@ -96,7 +100,8 @@ let table = [|
     builtin_div;
     builtin_abs;
     builtin_mod;
-    builtin_rem
+    builtin_rem;
+    
   |]
 
 

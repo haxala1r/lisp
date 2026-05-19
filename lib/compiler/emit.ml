@@ -115,6 +115,24 @@ and compile_one p = function
      let* _ = compile_one p y in
      emit_instr p Vm.Types.Remainder
   | Apply (Var (Intrinsic 7), xs) -> failwith ("invalid number of args for rem: " ^(string_of_int (List.length xs)))
+  | Apply (Var (Intrinsic 8), car :: cdr :: []) ->
+     let* _ = compile_one p car in
+     let* _ = compile_one p cdr in
+     emit_instr p Vm.Types.Cons
+  | Apply (Var (Intrinsic 9), c :: []) ->
+     let* _ = compile_one p c in
+     emit_instr p Vm.Types.Car
+  | Apply (Var (Intrinsic 10), c :: []) ->
+     let* _ = compile_one p c in
+     emit_instr p Vm.Types.Cdr
+  | Apply (Var (Intrinsic 11), c :: car :: []) ->
+     let* _ = compile_one p c in
+     let* _ = compile_one p car in
+     emit_instr p Vm.Types.SetCar
+  | Apply (Var (Intrinsic 12), c :: cdr :: []) ->
+     let* _ = compile_one p c in
+     let* _ = compile_one p cdr in
+     emit_instr p Vm.Types.SetCdr
   | Apply (Var (Intrinsic x), _) -> failwith ("unknown intrinsic: " ^ (string_of_int x))
   | Apply (f, args) ->
      let* _ = compile_one p f in
@@ -221,7 +239,7 @@ let rec constantify = function
   | Core_ast.Int x -> Vm.Types.Int x
   | Core_ast.String s -> Vm.Types.String (ref s)
   | Core_ast.Double x -> Vm.Types.Double x
-  | Core_ast.Cons (a, b) -> Vm.Types.Cons (ref (constantify a), ref (constantify b))
+  | Core_ast.Cons (a, b) -> Vm.Types.ConsCell (ref (constantify a), ref (constantify b))
   | Core_ast.Symbol s -> Vm.Types.Symbol s
 let make_globals (_prev_vm : Vm.Types.vm_state option) (tbl : (int * expression option) SymbolTable.t) =
   let global_count = ((SymbolTable.cardinal tbl)) in 

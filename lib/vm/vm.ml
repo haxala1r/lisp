@@ -122,30 +122,30 @@ and interpret state =
       let x = to_numeric (pop_one state) in
       push state (of_numeric (numeric_rem x y))); interpret state
   | Cons ->
-     let car = pop_one state in
      let cdr = pop_one state in
-     push state (Cons (ref car, ref cdr)); interpret state
+     let car = pop_one state in
+     push state (ConsCell (ref car, ref cdr)); interpret state
   | Car ->
      let cons = pop_one state in
      (match cons with
-     | Cons (car, _) -> push state !car ; interpret state
+     | ConsCell (car, _) -> push state !car ; interpret state
      | _ -> failwith ("Can't get car of non-cons object: " ^ (print_value cons)) )
   | Cdr ->
      let cons = pop_one state in
      (match cons with
-     | Cons (_, cdr) -> push state !cdr ; interpret state
+     | ConsCell (_, cdr) -> push state !cdr ; interpret state
      | _ -> failwith ("Can't get cdr of non-cons object: " ^ (print_value cons)) )
   | SetCar ->
      let v = pop_one state in
      let cons = pop_one state in
      (match cons with
-     | Cons (car, _) -> push state v ; car := v ; interpret state
+     | ConsCell (car, _) -> push state v ; car := v ; interpret state
      | _ -> failwith ("Can't set car of non-cons object: " ^ (print_value cons)) )
   | SetCdr -> 
      let v = pop_one state in
      let cons = pop_one state in
      (match cons with
-     | Cons (_, cdr) -> push state v ; cdr := v ; interpret state
+     | ConsCell (_, cdr) -> push state v ; cdr := v ; interpret state
      | _ -> failwith ("Can't set car of non-cons object: " ^ (print_value cons)) ))
 
 let make_vm instrs constants globals syms =

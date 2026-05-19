@@ -5,7 +5,7 @@ type value =
   | Double of float
   | String of string ref
   | Nil
-  | Cons of value ref * value ref
+  | ConsCell of value ref * value ref
   | Symbol of string
   | Closure of int * int * value ref list
   | Native of int (* This is basically a syscall, each ID represents a primitive operation
@@ -62,7 +62,7 @@ let rec print_value = function
     | Double x -> p "%f" x
     | String x -> p "\"%s\"" !x
     | Nil -> p "'()"
-    | Cons (a, b) -> p "(%s . %s)" (print_value !a) (print_value !b)
+    | ConsCell (a, b) -> p "(%s . %s)" (print_value !a) (print_value !b)
     | Symbol x -> p "'%s" x
     | Closure (a, i, _) -> p "<closure of %d args at %d>" a i
     | Native i -> p "<native %d>" i

@@ -71,6 +71,11 @@ let intrinsic_table =
       ("ABS", 5);
       ("MOD", 6);
       ("REM", 7);
+      ("CONS", 8);
+      ("CAR", 9);
+      ("CDR", 10);
+      ("SET-CAR!", 11);
+      ("SET-CDR!", 12)
     ]
 
 (* extract all defined global symbols, given the top-level expressions
@@ -209,7 +214,7 @@ let convert default_global_table top_level =
        global_tbl := SymbolTable.add s (id, Some analysis) !global_tbl;
        let tbl = SymbolTable.add s (SymbolTable.find s !global_tbl) tbl in
        let* rest = aux tbl rest in
-       if is_constantish analysis then Ok (rest) else Ok (analysis :: rest)
+       if is_constantish analysis then Ok (rest) else Ok ((Set (Global id,analysis)) :: rest)
   in
   let* program = (aux default_global_table top_level) in
   Ok (program, !global_tbl)
