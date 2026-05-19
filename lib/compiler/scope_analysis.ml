@@ -141,8 +141,12 @@ let resolve_var tbl env sym =
   Ok (Var sym)
 
 let resolve_set tbl env sym expr =
-  let* sym = resolve_symbol tbl env sym in
-  Ok (Set (sym, expr))
+  let* resolved = resolve_symbol tbl env sym in
+  match resolved with
+  | Intrinsic _ -> Error ("cannot set! intrinsic: "^sym)
+  | Global _ -> Error ("cannot set! global definition: "^sym)
+  | _ ->
+     Ok (Set (resolved, expr))
 
 let extract_function = function
   | Core_ast.Define (s, Core_ast.Lambda (args, rest, _)) -> Some (s, args, rest)
