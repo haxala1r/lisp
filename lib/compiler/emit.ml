@@ -147,6 +147,9 @@ and compile_one p = function
   | Apply (Var (Intrinsic 13), args) -> unary_helper "nil?" p Vm.Types.IsNil args
   | Apply (Var (Intrinsic 14), args) -> unary_helper "cons?" p Vm.Types.IsCons args
   | Apply (Var (Intrinsic 15), args) -> unary_helper "symbol?" p Vm.Types.IsSymbol args
+  | Apply (Var (Intrinsic 16), args) -> unary_helper "string?" p Vm.Types.IsString args
+  | Apply (Var (Intrinsic 17), args) -> unary_helper "closure?" p Vm.Types.IsClosure args
+  | Apply (Var (Intrinsic 18), args) -> unary_helper "number?" p Vm.Types.IsNumber args
   | Apply (Var (Intrinsic x), _) -> failwith ("unknown intrinsic: " ^ (string_of_int x))
   | Apply (f, args) ->
      let* _ = compile_one p f in

@@ -160,7 +160,21 @@ and interpret state =
   | IsSymbol ->
      (match pop_one state with
      | Symbol _ -> push state (Symbol "T")
+     | _ -> push state Nil); interpret state
+  | IsString ->
+     (match pop_one state with
+     | String _ -> push state (Symbol "T")
+     | _ -> push state Nil); interpret state
+  | IsClosure ->
+     (match pop_one state with
+     | Closure _ -> push state (Symbol "T")
+     | _ -> push state Nil); interpret state
+  | IsNumber ->
+     (match pop_one state with
+     | Double _
+     | Int _ -> push state (Symbol "T")
      | _ -> push state Nil); interpret state)
+
 
 let make_vm instrs constants globals syms =
   (*let globals = Array.init global_count (fun x -> if x < (Array.length Native.table) then Native x else Nil) in*)

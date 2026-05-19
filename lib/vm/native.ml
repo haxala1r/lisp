@@ -136,6 +136,26 @@ let builtin_issymbol = function
      | Symbol _ -> Symbol "T"
      | _ -> Nil)
   | _ -> failwith "invalid arguments to symbol?"
+let builtin_isstring = function
+  | v :: [] ->
+     (match !v with
+     | String _ -> Symbol "T"
+     | _ -> Nil)
+  | _ -> failwith "invalid arguments to string?"
+let builtin_isclosure = function
+  | v :: [] ->
+     (match !v with
+     | Native _
+     | Closure _ -> Symbol "T"
+     | _ -> Nil)
+  | _ -> failwith "invalid arguments to closure?"
+let builtin_isnumber = function
+  | v :: [] ->
+     (match !v with
+     | Double _
+     | Int _ -> Symbol "T"
+     | _ -> Nil)
+  | _ -> failwith "invalid arguments to number?"
 
 
 
@@ -156,6 +176,9 @@ let table = [|
     builtin_isnil;
     builtin_iscons;
     builtin_issymbol;
+    builtin_isstring;
+    builtin_isclosure;
+    builtin_isnumber;
   |]
 
 

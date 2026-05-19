@@ -45,6 +45,9 @@ type instr =
   | IsNil
   | IsCons
   | IsSymbol
+  | IsString
+  | IsClosure
+  | IsNumber
 
 type vm_state = {
     mutable i : int;
@@ -110,7 +113,9 @@ let print_one = function
     | IsNil -> p "NIL?\n"
     | IsCons -> p "CONS?\n"
     | IsSymbol -> p "SYMBOL?\n"
-
+    | IsString -> p "STRING?\n"
+    | IsClosure -> p "CLOSURE?\n"
+    | IsNumber -> p "NUMBER?\n"
 
 let print_instrs instrs =  
   Array.mapi_inplace
