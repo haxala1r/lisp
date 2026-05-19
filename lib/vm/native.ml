@@ -89,8 +89,36 @@ let builtin_rem =
   make_two_func "REM" (fun x y -> of_numeric (numeric_rem (to_numeric !x) (to_numeric !y)))
 
 let builtin_cons = function
-  | car :: cdr :: [] -> ConsCell (ref car, ref cdr)
+  | car :: cdr :: [] -> ConsCell (ref !car, ref !cdr)
   | _ -> failwith ("can't apply cons")
+
+let builtin_car = function
+  | c :: [] ->
+     (match !c with
+     | ConsCell (car, _) -> !car
+     | _ -> failwith ("Non-cons object passed to car: " ^ (print_value !c)))
+  | _ -> failwith "invalid arguments to car"
+let builtin_cdr = function
+  | c :: [] ->
+     (match !c with
+     | ConsCell (_, cdr) -> !cdr
+     | _ -> failwith ("Non-cons object passed to cdr: " ^ (print_value !c)))
+  | _ -> failwith "invalid arguments to cdr"
+
+let builtin_set_car = function
+  | c :: v :: [] ->
+     (match !c with
+     | ConsCell (car, _) -> car := !v; !v
+     | _ -> failwith ("Non-cons object passed to set-car!: " ^ (print_value !c)))
+  | _ -> failwith "invalid arguments to set-car!"
+let builtin_set_cdr = function
+  | c :: v :: [] ->
+     (match !c with
+     | ConsCell (_, cdr) -> cdr := !v; !v
+     | _ -> failwith ("Non-cons object passed to set-cdr!: " ^ (print_value !c)))
+  | _ -> failwith "invalid arguments to set-cdr!"
+
+
 
 let table = [|
     builtin_print;
@@ -101,7 +129,11 @@ let table = [|
     builtin_abs;
     builtin_mod;
     builtin_rem;
-    
+    builtin_cons;
+    builtin_car;
+    builtin_cdr;
+    builtin_set_car;
+    builtin_set_cdr;
   |]
 
 

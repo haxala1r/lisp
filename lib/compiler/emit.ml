@@ -119,20 +119,25 @@ and compile_one p = function
      let* _ = compile_one p car in
      let* _ = compile_one p cdr in
      emit_instr p Vm.Types.Cons
+  | Apply (Var (Intrinsic 8), _) -> failwith "invalid arguments to cons"
   | Apply (Var (Intrinsic 9), c :: []) ->
      let* _ = compile_one p c in
      emit_instr p Vm.Types.Car
+  | Apply (Var (Intrinsic 9), _) -> failwith "invalid arguments to car"
   | Apply (Var (Intrinsic 10), c :: []) ->
      let* _ = compile_one p c in
      emit_instr p Vm.Types.Cdr
+  | Apply (Var (Intrinsic 10), _) -> failwith "invalid arguments to cdr"
   | Apply (Var (Intrinsic 11), c :: car :: []) ->
      let* _ = compile_one p c in
      let* _ = compile_one p car in
      emit_instr p Vm.Types.SetCar
+  | Apply (Var (Intrinsic 11), _) -> failwith "invalid arguments to set-car!"
   | Apply (Var (Intrinsic 12), c :: cdr :: []) ->
      let* _ = compile_one p c in
      let* _ = compile_one p cdr in
      emit_instr p Vm.Types.SetCdr
+  | Apply (Var (Intrinsic 12), _) -> failwith "invalid arguments to set-cdr!"
   | Apply (Var (Intrinsic x), _) -> failwith ("unknown intrinsic: " ^ (string_of_int x))
   | Apply (f, args) ->
      let* _ = compile_one p f in
