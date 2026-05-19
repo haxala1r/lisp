@@ -118,6 +118,25 @@ let builtin_set_cdr = function
      | _ -> failwith ("Non-cons object passed to set-cdr!: " ^ (print_value !c)))
   | _ -> failwith "invalid arguments to set-cdr!"
 
+let builtin_isnil = function
+  | v :: [] ->
+     (match !v with
+     | Nil -> Symbol "T"
+     | _ -> Nil)
+  | _ -> failwith "invalid arguments to nil?"
+let builtin_iscons = function
+  | v :: [] ->
+     (match !v with
+     | ConsCell _ -> Symbol "T"
+     | _ -> Nil)
+  | _ -> failwith "invalid arguments to cons?"
+let builtin_issymbol = function
+  | v :: [] ->
+     (match !v with
+     | Symbol _ -> Symbol "T"
+     | _ -> Nil)
+  | _ -> failwith "invalid arguments to symbol?"
+
 
 
 let table = [|
@@ -134,6 +153,9 @@ let table = [|
     builtin_cdr;
     builtin_set_car;
     builtin_set_cdr;
+    builtin_isnil;
+    builtin_iscons;
+    builtin_issymbol;
   |]
 
 
