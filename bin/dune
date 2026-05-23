@@ -1,4 +1,4 @@
 (executable
  (name comp)
  (public_name ollisp)
- (libraries str unix compiler vm))
+ (libraries str unix compiler))
