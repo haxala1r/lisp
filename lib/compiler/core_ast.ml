@@ -18,11 +18,11 @@ type expression =
   | Literal of literal
   | Var of string
   | Apply of expression * expression list
-  | Lambda of string list * string option * expression
+  | Lambda of string list * expression
+  | Let of string * expression * expression
   | If of expression * expression * expression
   | Set of string * expression
   | Begin of expression list
-
 
 type top_level =
   | Define of string * expression
@@ -35,44 +35,32 @@ let rec pair_of_def : Syntactic_ast.def -> string * expression =
 and pair_of_binding (s, e) = (s, of_expr e)
 and pair_of_clause (e1, e2) = (of_expr e1, of_expr e2)
 
-and make_lambda (args, rest) body =
-  Lambda (args, rest, body)
+and make_lambda args body =
+  Lambda (args, body)
 
-(* desugars this...
-  (let ((x 5) (y 4)) (f x y))
-  ... into this...
-  ((lambda (x y) (f x y)) 5 4)
- *)
-and make_let bs body =
-  let bs = List.map pair_of_binding bs in
-  let args = List.map (fun (s, _) -> s) bs in
-  let es = List.map (fun (_, e) -> e) bs in
-  Apply (Lambda (args, None, body), es)
-
-(* The Core AST does not feature a letrec node. Instead, we desugar letrecs further
-   into a let that binds each symbol to nil, then `set!`s them to their real value
-   before running the body.
- *)
-and make_letrec bs exprs =
-  let tmp_bs = List.map (fun (_, _) -> Literal Nil) bs in
-  let setters = List.fold_right (fun (s, e) acc -> (Set (s, e)) :: acc) bs [] in
-  let args = List.map (fun (s, _) -> s) bs in
-  let body = Begin ((List.rev setters) @ exprs) in
-  Apply (Lambda (args, None, body), tmp_bs)
-
+and make_letrec defs e =
+  let sets = List.map (fun (s, e) -> Set (s,e)) defs in
+  let rec aux = function
+    | [] -> (Begin (List.append sets [e]))
+    | (s, _) :: rest -> Let (s, Literal Nil, aux rest) in
+  aux defs
 (* We convert a body into a regular letrec form.
    A body is defined as a series of definitions followed by a series
    of expressions. The definitions behave exactly as a letrec, so
    it makes sense to convert the body into a normal letrec.
  *)
 and of_body : Syntactic_ast.body -> expression = function
+  | ([], e :: []) -> of_expr e      
   | ([], exprs) ->
      let exprs = List.map of_expr exprs in
      Begin exprs
+  | (defs, e :: []) ->
+     let defs = List.map pair_of_def defs in
+     make_letrec defs (of_expr e)
   | (defs, exprs) ->
      let exprs = List.map of_expr exprs in
      let defs = List.map pair_of_def defs in
-     make_letrec defs exprs
+     make_letrec defs (Begin exprs)
 
 and of_ll : Syntactic_ast.lambda_list -> string list * string option = function
   | (sl, rest) -> (sl, rest)
@@ -88,9 +76,11 @@ and of_literal : Syntactic_ast.literal -> literal  = function
 and of_expr : Syntactic_ast.expr -> expression = function
   | Literal l -> Literal (of_literal l)
   | Var x -> Var x
-  | Lambda ((args, rest), b) -> Lambda (args, rest, of_body b)
-  | Let (bindings, b) -> make_let bindings (of_body b)
-  | LetRec (bindings, b) -> make_letrec (List.map pair_of_binding bindings) [(of_body b)]
+  | Lambda ((args, _), b) -> Lambda (args, of_body b)
+  | Let ([], b) -> of_body b
+  | Let ((s,e) :: [] , b) -> Let (s, of_expr e, of_body b)
+  | Let ((s, e) :: bindings, b) -> Let (s, of_expr e, of_expr (Let (bindings, b))) 
+  | LetRec (bindings, b) -> make_letrec (List.map pair_of_binding bindings) (of_body b)
   | Cond (clauses) -> 
      List.fold_right
        (fun (e1, e2) acc -> If (e1, e2, acc))
