@@ -21,7 +21,6 @@ type expression =
   | Lambda of string list * expression
   | Let of string * expression * expression
   | If of expression * expression * expression
-  | Set of string * expression
   | Begin of expression list
 
 type top_level =
@@ -39,7 +38,7 @@ and make_lambda args body =
   Lambda (args, body)
 
 and make_letrec defs e =
-  let sets = List.map (fun (s, e) -> Set (s,e)) defs in
+  let sets = List.map (fun (s, e) -> Apply (Var "set!",[Var s; e])) defs in
   let rec aux = function
     | [] -> (Begin (List.append sets [e]))
     | (s, _) :: rest -> Let (s, Literal Nil, aux rest) in
@@ -88,7 +87,6 @@ and of_expr : Syntactic_ast.expr -> expression = function
        (Literal Nil)
   | If (e1, e2, e3) ->
      If (of_expr e1, of_expr e2, of_expr e3)
-  | Set (s, e) -> Set (s, of_expr e)
   | Apply (f, es) -> Apply (of_expr f, List.map of_expr es)
 
 

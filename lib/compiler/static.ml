@@ -83,10 +83,6 @@ let rec alpha_convert gensym get_global bindings =
      let* e2 = self bindings e2 in
      let* e3 = self bindings e3 in
      Ok (If (e1, e2, e3))
-  | Set (s, e) ->
-     let* s = find_conversion s in
-     let* e = self bindings e in
-     Ok (Set (s, e))
                                    )
 
 let alpha_convert_top global_table = function

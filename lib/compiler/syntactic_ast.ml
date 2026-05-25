@@ -21,7 +21,6 @@ type expr =
   | LetRec of (string * expr) list * body
   | Cond of (expr * expr) list
   | If of expr * expr * expr
-  | Set of string * expr
   | Var of string
   | Apply of expr * expr list
 and def = string * expr
@@ -195,16 +194,6 @@ and builtin_if cons =
   let* else_branch = unwrap_exp (transform else_branch) in
   exp (If (test, then_branch, else_branch))
 
-and builtin_set cons =
-  let* cons = sexpr_cdr cons in
-  let* sym = sexpr_car cons in
-  let* sym = (match sym with
-             | LSymbol s -> Ok s
-             | _ -> Error "cannot (set!) a non-symbol") in
-  let* expr = sexpr_cadr cons in
-  let* expr = unwrap_exp (transform expr) in
-  exp (Set (sym, expr))
-
 and builtin_quote cons =
   let* expr = sexpr_cadr cons in
   let lit x = exp (Literal x) in
@@ -230,7 +219,6 @@ and builtin_symbol = function
   | "LETREC" -> (make_builtin_let (fun x y -> LetRec (x,y)))
   | "COND" -> builtin_cond
   | "IF" -> builtin_if
-  | "SET!" -> builtin_set
   | "QUOTE" -> builtin_quote
   | _ -> (function
        | LCons (f, args) -> apply f args
@@ -323,8 +311,6 @@ and print_expr = function
   | Var s -> s
   | If (e1, e2, e3) ->
      pf "(if %s %s %s)" (print_expr e1) (print_expr e2) (print_expr e3)
-  | Set (s, expr) ->
-     pf "(set! %s %s)" s (print_expr expr)
   | Apply (f, exprs) ->
      pf "(apply %s %s)"
        (print_expr f)

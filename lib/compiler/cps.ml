@@ -24,7 +24,6 @@ type value =
    The equivalents of each node in scheme syntax are written for clarity
  *)
 and expr =
-  | Set of string * value * expr
   (* (f args... k) *)
   | App of value * value list * value
   (* (k v) *)
@@ -49,7 +48,6 @@ let rec print_value = function
   | Cont (k, e) -> p "<cont %s %s>" k (print_expr e)
 
 and print_expr = function
-  | Set (s, v, e) -> p "set %s = %s in\n%s" s (print_value v) (print_expr e)
   | App (f, args, k) -> p "(%s %s %s)" (print_value f) (List.fold_left (fun x y -> x ^ " " ^ (print_value y)) "" args) (print_value k)
   | CApp (k, v) -> p "(%s %s)" (print_value k) (print_value v)
   | If (t, th, el) -> p "if %s then %s else %s" (print_value t) (print_expr th) (print_expr el)
@@ -57,7 +55,6 @@ and print_expr = function
 
 
 let rec sub_symbol_in_expr s target =
-  let extract = function | Core_ast.Var s -> s | _ -> failwith "what" in
   let self x = sub_symbol_in_expr s target x in
   function
   | Core_ast.Var sp when String.equal s sp ->
@@ -70,8 +67,6 @@ let rec sub_symbol_in_expr s target =
      Core_ast.Let (keep, self e1, self e2)
   | Core_ast.If (e1, e2, e3) ->
      Core_ast.If (self e1, self e2, self e3)
-  | Core_ast.Set (sp, e1) ->
-     Core_ast.Set ((if String.equal s sp then extract target else sp), self e1)
   | Core_ast.Begin (es) ->
      Core_ast.Begin (List.map self es)
   | rest -> rest
@@ -112,8 +107,6 @@ let rec cps (e : Core_ast.expression) (k : value -> expr) : expr =
        CApp ((Cont (ksym, cps e1 (fun v ->
                               If (v, (cps e2 c), (cps e3 c))))),
              k)
-    | Set (s, e) ->
-       cps e (fun v -> Set (s, v, k v))
     | Begin [] -> k (Literal Nil)
     | Begin (e :: []) ->
        cps e k
@@ -188,10 +181,6 @@ let rec freevar_value globals args = function
   | Cont (ka, body) ->
      freevar_expr globals (ka :: args) body
 and freevar_expr globals args = function
-  | Set (s, v, e) ->
-     (freevar_value globals args v) @
-       (freevar_value globals args (Var s)) @
-         (freevar_expr globals args e)
   | App (f, ass, k) ->
      (freevar_value globals args f) @
        (List.concat (List.map (freevar_value globals args) ass)) @
@@ -231,10 +220,6 @@ and closure_convert info (env : (string, flat_access) Hashtbl.t) (funs : (flat_l
   let self x = closure_convert info env funs x in
   let flatten v = flatten_val info env funs v in
   match e with
-  | Set (var, v, rest) ->
-     (match Hashtbl.find_opt env var with
-     | Some acc -> FSet (acc, flatten v, self rest)
-     | None -> failwith ("symbol " ^ var ^ " is not defined (this was found during closure conversion after CPS, this should be impossible)"))
   | App (f, args, k) ->
      FApp (flatten f, List.map flatten args, flatten k)
   | CApp (k, v) -> FCApp (flatten k, flatten v)
