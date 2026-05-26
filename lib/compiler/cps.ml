@@ -9,6 +9,9 @@ type primop =
   | Sub
   | Mul
   | Div
+(* These are the delimited continuation operators *)
+  | Shift
+  | Reset
 
 (* Trivial values *)
 type value =
@@ -29,6 +32,8 @@ and expr =
   (* (k v) *)
   | CApp of value * value
   | If of value * expr * expr
+  (* (primop args... k) *)
+  | Primitive of primop * value list * value
   | Halt of value
 
 (* debug prints *)
@@ -41,6 +46,15 @@ let rec print_literal = function
   | (Symbol s) -> p "<symbol %s>" s
   | (Cons (a, b)) -> p "(%s . %s)" (print_literal a) (print_literal b)
 
+let primop = function
+  | Add -> "+"
+  | Sub -> "-"
+  | Mul -> "*"
+  | Div -> "/"
+  | Shift -> "SHIFT"
+  | Reset -> "RESET"
+
+
 let rec print_value = function
   | Literal l -> print_literal l
   | Var s -> p "%s" s
@@ -51,6 +65,7 @@ and print_expr = function
   | App (f, args, k) -> p "(%s %s %s)" (print_value f) (List.fold_left (fun x y -> x ^ " " ^ (print_value y)) "" args) (print_value k)
   | CApp (k, v) -> p "(%s %s)" (print_value k) (print_value v)
   | If (t, th, el) -> p "if %s then %s else %s" (print_value t) (print_expr th) (print_expr el)
+  | Primitive (prim, args, k) -> p "p(%s %s %s)" (primop prim) (List.fold_left (fun x y -> x ^ " " ^ (print_value y)) "" args) (print_value k)
   | Halt v -> print_value v
 
 
@@ -130,10 +145,10 @@ type flat_value =
   | FLambda of flat_label * int * flat_access list
   | FCont of flat_label * flat_access list
 type flat_expr =
-  | FSet of flat_access * flat_value * flat_expr
   | FApp of flat_value * flat_value list * flat_value
   | FCApp of flat_value * flat_value
   | FIf of flat_value * flat_expr * flat_expr
+  | FPrimitive of primop * flat_value list * flat_value
   | FHalt of flat_value
 
 type info = {
@@ -161,10 +176,10 @@ let print_flat_val info = function
   | FCont (l, pack) -> p "<continuation closure '%s' of 1 arg, packing %s)>" l (List.fold_left (fun x y -> x ^ " " ^ (print_access info y)) "(" pack)
 
 let rec print_flat info = function
-  | FSet (acc, v, e) -> p "(set! %s %s %s)" (print_access info acc) (print_flat_val info v) (print_flat info e)
   | FApp (f, args, k) -> p "(%s %s %s)" (print_flat_val info f) (List.fold_left (fun x y -> x ^ " " ^ (print_flat_val info y)) "" args) (print_flat_val info k)
   | FCApp (k, v) -> p "(%s %s)" (print_flat_val info k) (print_flat_val info v)
   | FIf (v, e1, e2) -> p "(if %s %s %s)" (print_flat_val info v) (print_flat info e1) (print_flat info e2)
+  | FPrimitive (prim, args, k) -> p "p(%s %s %s)" (primop prim) (List.fold_left (fun x y -> x ^ " " ^ (print_flat_val info y)) "" args) (print_flat_val info k)
   | FHalt v -> p "%s" (print_flat_val info v)
 
 
@@ -192,6 +207,9 @@ and freevar_expr globals args = function
      (freevar_value globals args v) @
        (freevar_expr globals args e1) @
          (freevar_expr globals args e2)
+  | Primitive (_, ass, k) ->
+     (List.concat (List.map (freevar_value globals args) ass)) @
+       (freevar_value globals args k)
   | Halt v -> freevar_value globals args v
     
 
@@ -224,6 +242,8 @@ and closure_convert info (env : (string, flat_access) Hashtbl.t) (funs : (flat_l
      FApp (flatten f, List.map flatten args, flatten k)
   | CApp (k, v) -> FCApp (flatten k, flatten v)
   | If (v, e1, e2) -> FIf (flatten v, self e1, self e2)
+  | Primitive (p, args, k) ->
+     FPrimitive (p, List.map flatten args, flatten k)
   | Halt v -> FHalt (flatten v)
 
 

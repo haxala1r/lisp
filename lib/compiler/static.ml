@@ -11,14 +11,6 @@ type info = {
   }
 
 
-let rec map_cps f xs k = match xs with
-  | [] -> []
-  | x :: xs ->
-     (f x
-        (fun v ->
-          let k = (fun vs -> let vs = v :: vs in k vs) in
-          map_cps f xs k))
-
 let make_id_counter () =
   let i = ref 0 in
   fun () ->
@@ -26,9 +18,10 @@ let make_id_counter () =
   i := x + 1 ; x
 
 let rec collect_globals f i = function
-  | [] -> ()      
-  | Core_ast.Define (s, _) :: rest->
-     f s (i ()); collect_globals f i rest
+  | [] -> Ok ()      
+  | Core_ast.Define (s, _) :: rest ->
+     let* () = f s (i ()) in
+     collect_globals f i rest
   | Core_ast.Expr _ :: rest ->
      collect_globals f i rest
 
@@ -37,8 +30,9 @@ let rec collect_globals f i = function
  *)
 let get_globals program =
   let ht = Hashtbl.create 256 in
-  collect_globals (Hashtbl.add ht) (make_id_counter ()) program;
-  ht
+  let add s i = if Option.is_some (Hashtbl.find_opt ht s) then Error ("error: re-definition of " ^ s) else Ok (Hashtbl.add ht s i) in
+  let* () = collect_globals add (make_id_counter ()) program in
+  Ok ht
 
 let rec find_conversion s get_global = function
   | [] ->
@@ -102,7 +96,7 @@ let separate_program program =
   in aux [] program
 
 let extract_info program =
-  let globals = get_globals program in
+  let* globals = get_globals program in
   let* program = traverse (alpha_convert_top globals) program in
   let (toplevel, defs) = separate_program program in
   Ok {
