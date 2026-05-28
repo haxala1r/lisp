@@ -35,6 +35,7 @@ and expr =
   (* (primop args... k) *)
   | Primitive of primop * value list * value
   | Halt of value
+  | HaltIntoGlobal of value * int
 
 (* debug prints *)
 let p = Printf.sprintf
@@ -67,6 +68,7 @@ and print_expr = function
   | If (t, th, el) -> p "if %s then %s else %s" (print_value t) (print_expr th) (print_expr el)
   | Primitive (prim, args, k) -> p "p(%s %s %s)" (primop prim) (List.fold_left (fun x y -> x ^ " " ^ (print_value y)) "" args) (print_value k)
   | Halt v -> print_value v
+  | HaltIntoGlobal (v, i) -> p "(set-global! %i %s)" i (print_value v)
 
 
 let rec sub_symbol_in_expr s target =
@@ -150,6 +152,7 @@ type flat_expr =
   | FIf of flat_value * flat_expr * flat_expr
   | FPrimitive of primop * flat_value list * flat_value
   | FHalt of flat_value
+  | FHaltIntoGlobal of flat_value * int
 
 type info = {
     defs : (flat_label, flat_expr) Hashtbl.t;
@@ -181,7 +184,7 @@ let rec print_flat info = function
   | FIf (v, e1, e2) -> p "(if %s %s %s)" (print_flat_val info v) (print_flat info e1) (print_flat info e2)
   | FPrimitive (prim, args, k) -> p "p(%s %s %s)" (primop prim) (List.fold_left (fun x y -> x ^ " " ^ (print_flat_val info y)) "" args) (print_flat_val info k)
   | FHalt v -> p "%s" (print_flat_val info v)
-
+  | FHaltIntoGlobal (v, i) -> p "(set-global! %d %s " i (print_flat_val info v)
 
 let rec freevar_value globals args = function
   | Literal _ -> []
@@ -211,6 +214,7 @@ and freevar_expr globals args = function
      (List.concat (List.map (freevar_value globals args) ass)) @
        (freevar_value globals args k)
   | Halt v -> freevar_value globals args v
+  | HaltIntoGlobal (v, _) -> freevar_value globals args v
     
 
 let rec flatten_val (info : Static.info) env funs = function
@@ -245,6 +249,7 @@ and closure_convert info (env : (string, flat_access) Hashtbl.t) (funs : (flat_l
   | Primitive (p, args, k) ->
      FPrimitive (p, List.map flatten args, flatten k)
   | Halt v -> FHalt (flatten v)
+  | HaltIntoGlobal (v, i) -> FHaltIntoGlobal (flatten v, i)
 
 
 let print_info i =
@@ -267,7 +272,7 @@ let top_level e =
   Hashtbl.(Seq.iter (fun (s, _) -> add env s (Global (find info.globals s))) (to_seq info.defs));
   let funs = Queue.create () in
   let defs = Hashtbl.create 256 in
-  Hashtbl.(Seq.iter (fun (s, e) -> add defs s (closure_convert info env funs (cps e (fun v -> Halt v)))) (to_seq info.defs));
+  Hashtbl.(Seq.iter (fun (s, e) -> add defs s (closure_convert info env funs (cps e (fun v -> HaltIntoGlobal (v, find info.globals s))))) (to_seq info.defs));
   let toplevel = List.map (closure_convert info env funs) toplevel in
   let new_info = {
       defs;
@@ -276,4 +281,5 @@ let top_level e =
       globals=info.globals;
       toplevel;
     } in
+  print_info new_info;
   Ok new_info
