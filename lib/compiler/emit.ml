@@ -94,7 +94,7 @@ let emit (info : Cps.info) : Vm.vm =
       instrs = (Dynarray.create ());
       consts = Dynarray.create();
       labels = Hashtbl.create 256;
-      globals = Array.make (Hashtbl.length info.defs) Vm.Nil;
+      globals = Array.make (Hashtbl.length info.globals) Vm.Nil;
     } in
   Queue.iter (fun (l, _, b) -> compile_func state l b) info.funs;
   let i = current_i state in
@@ -105,10 +105,10 @@ let emit (info : Cps.info) : Vm.vm =
       instrs = Iarray.of_array (Dynarray.to_array state.instrs);
       globals = state.globals;
       constants = Iarray.of_array (Dynarray.to_array state.consts);
-      args = Iarray.of_list [];
-      next_args =Array.make 32 Vm.Nil;
-      env = Iarray.of_list [];
-      next_env = Array.make 32 Vm.Nil;
+      args = Array.make 0 Vm.Nil;
+      next_args = Dynarray.create ();
+      env = Array.make 0 Vm.Nil;
+      next_env = Dynarray.create ();
       tmp = Vm.Nil;
       meta_stack = [];
     } in vm

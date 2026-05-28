@@ -7,8 +7,8 @@ type value =
   | Nil
   | Cons of value ref * value ref
   | Box of value ref
-  | Closure of int * value iarray
-  | Continuation of int * value iarray
+  | Closure of int * value array
+  | Continuation of int * value array
 
 let rec print_val = function
   | Int  x -> string_of_int x
@@ -45,10 +45,10 @@ type vm = {
     instrs : instr iarray;
     globals : value array;
     mutable constants : value iarray;
-    mutable args : value iarray;
-    mutable next_args : value array;
-    mutable env : value iarray;
-    mutable next_env : value array;
+    mutable args : value array;
+    mutable next_args : value Dynarray.t;
+    mutable env : value array;
+    mutable next_env : value Dynarray.t;
 
     mutable tmp : value;
 
@@ -83,25 +83,27 @@ let print_vm vm =
   print_endline "globals:";
   Array.iteri (fun i v -> print_string (string_of_int i ^": "^print_val v^" | " )) vm.globals;
   print_endline "args:";
-  Iarray.iteri (fun i v -> print_string (string_of_int i ^": "^print_val v^" | " )) vm.args;
+  Array.iteri (fun i v -> print_string (string_of_int i ^": "^print_val v^" | " )) vm.args;
   print_endline "env:";
-  Iarray.iteri (fun i v -> print_string (string_of_int i ^": "^print_val v^" | " )) vm.env;
+  Array.iteri (fun i v -> print_string (string_of_int i ^": "^print_val v^" | " )) vm.env;
   print_endline ""
-  
-  
 
+
+let rec add_dynarray arr i v =
+  if (Dynarray.length arr) <= i then
+    (Dynarray.add_last arr Nil; add_dynarray arr i v)
+  else Dynarray.set arr i v
 let do_access vm = function
   | Tmp -> vm.tmp
   | Global i -> vm.globals.(i)
-  | Arg i -> Iarray.get vm.args i
-  | Env i -> Iarray.get vm.env i
-
+  | Arg i -> Array.get vm.args i
+  | Env i -> Array.get vm.env i
 let put vm target v =
   match target with
   | Tmp -> vm.tmp <- v
   | Global i -> Array.set vm.globals i v
-  | Arg i -> Array.set vm.next_args i v
-  | Env i -> Array.set vm.next_env i v
+  | Arg i -> add_dynarray vm.next_args i v
+  | Env i -> add_dynarray vm.next_env i v
 
 let is_truthy = function
   | Nil -> false
@@ -116,21 +118,21 @@ let rec interpret vm =
   else
   match Iarray.get vm.instrs i with
   | MkClosure (target, index) ->
-     let new_env = Iarray.of_array vm.next_env in
-     vm.next_env <- Array.make 32 Nil;
+     let new_env = Dynarray.to_array vm.next_env in
+     vm.next_env <- Dynarray.create ();
      put vm target (Closure (index, new_env));
      interpret vm
   | MkCont (target, index) ->
-     let new_env = Iarray.of_array vm.next_env in
-     vm.next_env <- Array.make 32 Nil;
+     let new_env = Dynarray.to_array vm.next_env in
+     vm.next_env <- Dynarray.create ();
      put vm target (Continuation (index, new_env));
      interpret vm
   | Invoke acc ->
      (match do_access vm acc with
      | Closure (i, env)
        | Continuation (i, env) ->
-        vm.args <- Iarray.of_array vm.next_args;
-        vm.next_args <- Array.make 32 Nil;
+        vm.args <- Dynarray.to_array vm.next_args;
+        vm.next_args <- Dynarray.create ();
         vm.i <- i;
         vm.env <- env
      | v -> failwith ("Cannot invoke non-closure object: " ^ print_val v));

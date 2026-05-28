@@ -11,8 +11,8 @@ type info = {
   }
 
 
-let make_id_counter () =
-  let i = ref 0 in
+let make_id_counter start =
+  let i = ref start in
   fun () ->
   let x = !i in
   i := x + 1 ; x
@@ -25,13 +25,16 @@ let rec collect_globals f i = function
   | Core_ast.Expr _ :: rest ->
      collect_globals f i rest
 
+let default_globals = ["+"]
+
 (* extract global definitions from a program.
    Symbols that are not defined cannot be used at all.
  *)
 let get_globals program =
   let ht = Hashtbl.create 256 in
+  Hashtbl.add_seq ht (List.to_seq (List.mapi (fun i x -> (x, i)) default_globals));
   let add s i = if Option.is_some (Hashtbl.find_opt ht s) then Error ("error: re-definition of " ^ s) else Ok (Hashtbl.add ht s i) in
-  let* () = collect_globals add (make_id_counter ()) program in
+  let* () = collect_globals add (make_id_counter (List.length default_globals)) program in
   Ok ht
 
 let rec find_conversion s get_global = function
