@@ -1,6 +1,9 @@
 
 let ( let* ) = Result.bind
-let src = "(reset ())"
+let src = "
+           (let ((x (reset (shift k (print \"exception\") k) (print 'notexecuted))))
+            (print 'back)
+            (x 15))"
 let c = Compiler.Core_ast.of_src src
 let _ = (match (
           let* c = c in
@@ -10,4 +13,3 @@ let _ = (match (
           Ok (Vm.interpret v)) with
         | Ok () -> () 
         | Error s -> failwith ("noo: " ^ s))
-let _ = print_endline "hi"

@@ -125,14 +125,26 @@ let pop_meta vm =
      vm.meta_stack <- rest;
      one
 
+let get_arg vm i =
+  Array.get vm.args i
+
+let invoke vm = function
+  | Closure (i, env)
+    | Continuation (i, env) ->
+     vm.args <- Dynarray.to_array vm.next_args;
+     vm.next_args <- Dynarray.create ();
+     vm.i <- i;
+     vm.env <- env
+  | v -> failwith ("Cannot invoke non-closure object: " ^ print_val v)
+
 let is_truthy = function
   | Nil -> false
   | _ -> true
 
 let rec interpret vm =
   let i = vm.i in
-  print_vm vm;
-  print_endline (string_of_int i);
+  (*print_vm vm;*)
+  (*print_endline (string_of_int i);*)
   vm.i <- i + 1;
   if (i >= Iarray.length vm.instrs) then ()
   else
@@ -148,14 +160,7 @@ let rec interpret vm =
      put vm target (Continuation (index, new_env));
      interpret vm
   | Invoke acc ->
-     (match do_access vm acc with
-     | Closure (i, env)
-       | Continuation (i, env) ->
-        vm.args <- Dynarray.to_array vm.next_args;
-        vm.next_args <- Dynarray.create ();
-        vm.i <- i;
-        vm.env <- env
-     | v -> failwith ("Cannot invoke non-closure object: " ^ print_val v));
+     invoke vm (do_access vm acc);
      interpret vm
   | LoadInto (target, src) ->
      put vm target (do_access vm src); interpret vm
@@ -169,7 +174,13 @@ let rec interpret vm =
   | Halt acc ->
      let v = do_access vm acc in
      print_endline (print_val v)
-  | Print -> failwith "PRINT TRIGGERED"
+  | Print ->
+     let v = Dynarray.get vm.next_args 0 in
+     let k = Dynarray.get vm.next_args 1 in
+     print_string (print_val v);
+     vm.next_args <- Dynarray.of_list [v];
+     invoke vm k;
+     interpret vm
   | Add -> failwith "ADD TRIGGERED"
   | Sub -> failwith "SUB TRIGGERED"
   | Mul -> failwith "MUL"
@@ -181,14 +192,7 @@ let rec interpret vm =
      let cont = pop_meta vm in
      let arg = do_access vm acc in
      put vm (Arg 0) arg;
-     (match cont with
-     | Closure (i, env)
-       | Continuation (i, env) ->
-        vm.args <- Dynarray.to_array vm.next_args;
-        vm.next_args <- Dynarray.create ();
-        vm.i <- i;
-        vm.env <- env;
-     | v -> failwith ("cannot metareturn on "^print_val v));
+     invoke vm cont;
      interpret vm
 
   

@@ -157,9 +157,12 @@ let rec cps (e : Core_ast.expression) (k : value -> expr) : expr =
        let k_val = Cont (res, k (Var res)) in
        ResetBoundary (k_val, cps b (fun v -> MetaReturn v))
     | Shift (kvar, e) ->
-       let res = gensym "shift_del" in
+       let v_arg = gensym "v" in
+       let k_call = gensym "k_call" in
+       let res = gensym "res" in
        let k_del = Cont (res, k (Var res)) in
-       CApp (Cont (kvar, cps e (fun v -> MetaReturn v)), k_del)
+       let k_reified : value = Lambda ([v_arg], k_call, ResetBoundary (Var k_call, CApp (k_del, Var v_arg))) in
+       CApp (Cont (kvar, cps e (fun v -> MetaReturn v)), k_reified)
   )
 
 (*
