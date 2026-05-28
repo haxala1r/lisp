@@ -1,9 +1,19 @@
 
 let ( let* ) = Result.bind
 let src = "
-           (let ((x (reset (shift k (print \"exception\") k) (print 'notexecuted))))
-            (print 'back)
-            (x 15))"
+           (define (try thunk)
+  (reset
+    (thunk)))
+(define (throw ex)
+  (shift k ex))
+
+(define (db-access)
+   \"assume that this is some abstract access that may throw\"
+   (throw 'fuck))
+(try (lambda ()
+  (let ((x (db-access)))
+     (print x))))
+"
 let c = Compiler.Core_ast.of_src src
 let _ = (match (
           let* c = c in

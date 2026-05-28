@@ -165,6 +165,83 @@ let rec cps (e : Core_ast.expression) (k : value -> expr) : expr =
        CApp (Cont (kvar, cps e (fun v -> MetaReturn v)), k_reified)
   )
 
+(* eta reduction *)
+
+let rec subst_value x r = function
+  | Var s when String.equal s x -> r
+  | (Var _ | Literal _) as v -> v
+  | Lambda (args, karg, body) ->
+     if List.exists (String.equal x) args || String.equal karg x
+     then Lambda (args, karg, body)
+     else Lambda (args, karg, subst_expr x r body)
+  | Cont (karg, body) ->
+     if String.equal x karg
+     then Cont (karg, body)
+     else  Cont (karg, subst_expr x r body)
+and subst_expr x r = function
+  | App (f, args, k) ->
+     App (subst_value x r f,
+          List.map (subst_value x r) args,
+          subst_value x r k)
+  | CApp (k, v) ->
+     CApp (subst_value x r k, subst_value x r v)
+  | If (v, e1, e2) ->
+     If (subst_value x r v,
+         subst_expr x r e1,
+         subst_expr x r e2)
+  | Primitive (p, args, k) ->
+     Primitive (p,
+                List.map (subst_value x r) args,
+                subst_value x r k)
+  | Halt v -> Halt (subst_value x r v)
+  | HaltIntoGlobal (v, i) -> HaltIntoGlobal (subst_value x r v, i)
+  | ResetBoundary (v, e) ->
+     ResetBoundary (subst_value x r v, subst_expr x r e)
+  | MetaReturn v -> MetaReturn (subst_value x r v)
+
+(* eta reduction - reduce unnecessary continuations (eta redexes) *)
+let rec eta_reduce = function
+  (* Cont (v, CApp (k, v)) forms a redundant continuation
+     that just passes its argument to k.
+   *)
+  | CApp (Cont (v, CApp (k, Var v')), arg)
+       when String.equal v v' ->
+     eta_reduce (CApp (k, arg))
+  (* Cont (v, MetaReturn v) is redundant
+     equivalent to MetaReturn v
+   *)
+  | CApp (Cont (v, MetaReturn (Var v')), arg)
+       when String.equal v v' ->
+     eta_reduce (MetaReturn arg)
+  | MetaReturn (Cont (v, CApp (k, Var v')))
+       when String.equal v v' ->
+     MetaReturn k
+  | MetaReturn (Cont (v, MetaReturn (Var v')))
+       when String.equal v v' ->
+     MetaReturn (Var v)
+
+  (* beta reduction.
+     inline trivial Cont immediately
+   *)
+  | CApp (Cont (v, body), arg) ->
+     eta_reduce (subst_expr v arg body)
+
+  (* structural recursion *)
+  | App (f, args, k) ->
+     App (f, List.map eta_reduce_value args, eta_reduce_value k)
+  | If (v, e1, e2) ->
+     If (v, eta_reduce e1, eta_reduce e2)
+  | Primitive (p, args, k) ->
+     Primitive (p, List.map eta_reduce_value args, eta_reduce_value k)
+  | ResetBoundary (v, e) ->
+     ResetBoundary (v, eta_reduce e)
+  | e -> e
+and eta_reduce_value = function
+  | Lambda (args, karg, body) ->
+     Lambda (args, karg, eta_reduce body)
+  | Cont (karg, body) ->
+     Cont (karg, eta_reduce body)
+  | v -> v
 (*
   Flattening the converted tree
   Here we perform closure conversion, and flatten the tree performed by
@@ -265,7 +342,7 @@ let rec flatten_val (info : Static.info) (env : flat_access StringMap.t) funs = 
      let (env, i) = List.fold_left (fun (e, i) a -> (StringMap.add a (Arg i) e, i + 1)) (env, 0) args in
      let (env, _) = List.fold_left (fun (e, i) s -> (StringMap.add s (Env i) e, i + 1)) (env, 0) to_pack in
      let env = StringMap.add karg (Arg i) env in
-     Queue.add (label, (List.length args) + 1, closure_convert info env funs body) funs;
+     Queue.add (label, (List.length args) + 1, closure_convert info env funs (eta_reduce body)) funs;
      FLambda (label, (List.length args) + 1, before_pack)
   | Cont (karg, body) ->
      let label = gensym "continuation" in
@@ -273,7 +350,7 @@ let rec flatten_val (info : Static.info) (env : flat_access StringMap.t) funs = 
      let before_pack = List.map (fun s -> StringMap.find s env) to_pack in
      let env = StringMap.add karg (Arg 0) env in
      let (env, _) = List.fold_left (fun (e, i) s -> (StringMap.add s (Env i) e, i + 1)) (env, 0) to_pack in
-     Queue.add (label, 1, closure_convert info env funs body) funs;
+     Queue.add (label, 1, closure_convert info env funs (eta_reduce body)) funs;
      FCont (label, before_pack)
 
 and closure_convert info (env : flat_access StringMap.t) (funs : (flat_label * int * flat_expr) Queue.t) e =
@@ -306,12 +383,12 @@ let print_info i =
 
 let top_level e =
   let* info = Static.extract_info e in
-  let toplevel = List.map (fun e -> cps e (fun v -> Halt v)) info.toplevel in
+  let toplevel = List.map (fun e -> eta_reduce (cps e (fun v -> Halt v))) info.toplevel in
   let env = StringMap.empty in
   let env = (Hashtbl.fold (fun s _ e -> StringMap.add s (Global (Hashtbl.find info.globals s)) e) info.globals env) in
   let funs = Queue.create () in
   let defs = Hashtbl.create 256 in
-  Hashtbl.(Seq.iter (fun (s, e) -> add defs s (closure_convert info env funs (cps e (fun v -> HaltIntoGlobal (v, find info.globals s))))) (to_seq info.defs));
+  Hashtbl.(Seq.iter (fun (s, e) -> add defs s (closure_convert info env funs (eta_reduce (cps e (fun v -> HaltIntoGlobal (v, find info.globals s)))))) (to_seq info.defs));
   let toplevel = List.map (closure_convert info env funs) toplevel in
   let new_info = {
       defs;
