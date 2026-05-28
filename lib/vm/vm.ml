@@ -38,6 +38,7 @@ type instr =
   | If of access * int * int
   | Halt of access
   | Add
+  | Sub
 
 
 type vm = {
@@ -73,6 +74,7 @@ let string_of_instr = function
   | If (a, i1, i2) -> "If "^string_of_acc a^", "^string_of_int i1^", "^string_of_int i2
   | Halt a -> "Halt "^string_of_acc a
   | Add -> "Add"
+  | Sub -> "Sub"
 
 let print_instrs state =
   Iarray.iteri (fun i ins -> print_endline (string_of_int i^": "^string_of_instr ins)) state.instrs
@@ -150,5 +152,6 @@ let rec interpret vm =
      let v = do_access vm acc in
      print_endline (print_val v)
   | Add -> failwith "ADD TRIGGERED"
+  | Sub -> failwith "SUB TRIGGERED"
 
   

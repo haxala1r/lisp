@@ -55,6 +55,20 @@ let primop = function
   | Shift -> "SHIFT"
   | Reset -> "RESET"
 
+let primop_of_string = function
+  | "+" -> Some Add
+  | "-" -> Some Sub
+  | "*" -> Some Mul
+  | "/" -> Some Div
+  | "SHIFT" -> Some Shift
+  | "RESET" -> Some Reset
+  | _ -> None
+
+let primop_or_f args k s =
+  match primop_of_string s with
+  | Some p -> Primitive (p, args, k)
+  | None -> App (Var s, args, k)
+
 
 let rec print_value = function
   | Literal l -> print_literal l
@@ -107,7 +121,9 @@ let rec cps (e : Core_ast.expression) (k : value -> expr) : expr =
          aux (fun vs ->
              let res = gensym "result" in
              let cont = Cont (res, k (Var res)) in
-             App (f, vs, cont)) [] args)
+             match f with
+             | Var s -> primop_or_f vs cont s
+             | _ -> App (f, vs, cont)) [] args)
     | Let (s, e, b) ->
        (* We actually perform some reduction here *)
        let contarg = gensym "karg" in
@@ -265,7 +281,7 @@ let top_level e =
   let* info = Static.extract_info e in
   let toplevel = List.map (fun e -> cps e (fun v -> Halt v)) info.toplevel in
   let env = StringMap.empty in
-  let env = (Hashtbl.fold (fun s _ e -> StringMap.add s (Global (Hashtbl.find info.globals s)) e) info.defs env) in
+  let env = (Hashtbl.fold (fun s _ e -> StringMap.add s (Global (Hashtbl.find info.globals s)) e) info.globals env) in
   let funs = Queue.create () in
   let defs = Hashtbl.create 256 in
   Hashtbl.(Seq.iter (fun (s, e) -> add defs s (closure_convert info env funs (cps e (fun v -> HaltIntoGlobal (v, find info.globals s))))) (to_seq info.defs));

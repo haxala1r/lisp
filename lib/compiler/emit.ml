@@ -38,6 +38,7 @@ let emit_primop state =
   let e = emit_instr state in
   function
   | Cps.Add -> e Vm.Add
+  | Cps.Sub -> e Vm.Sub
   | _ -> failwith "unknown primitive"
 
 let compile_value state into = function
