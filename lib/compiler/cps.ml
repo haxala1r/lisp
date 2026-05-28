@@ -156,35 +156,31 @@ type flat_expr =
 
 type info = {
     defs : (flat_label, flat_expr) Hashtbl.t;
-    env : (string, flat_access) Hashtbl.t;
     funs : (flat_label * int * flat_expr) Queue.t;
     globals : (string, int) Hashtbl.t;
     toplevel : flat_expr list;
   }
 
+module StringMap = Map.Make(String)
 
-let try_find_sym info acc =
-  match (Seq.find (fun (_, acc2) -> acc2 == acc) (Hashtbl.to_seq info.env)) with
-  | Some (s, _) -> s
-  | None -> "CANTFIND"
-
-let print_access info = function
-  | Global i as acc -> p "(global %d %s)" i (try_find_sym info acc)
-  | Arg i as acc -> p "(arg %d %s)" i (try_find_sym info acc)
-  | Env i as acc -> p "(env %d %s)" i (try_find_sym info acc)
-let print_flat_val info = function
+let print_access = function
+  | Global i -> p "(global %d )" i 
+  | Arg i -> p "(arg %d )" i 
+  | Env i -> p "(env %d )" i 
+let print_flat_val = function
   | FLiteral l -> print_literal l
-  | FVar a -> print_access info a
-  | FLambda (l, a, pack) -> p "<closure '%s' of %d args, packing %s)>" l a (List.fold_left (fun x y -> x ^ " " ^ (print_access info y)) "(" pack)
-  | FCont (l, pack) -> p "<continuation closure '%s' of 1 arg, packing %s)>" l (List.fold_left (fun x y -> x ^ " " ^ (print_access info y)) "(" pack)
+  | FVar a -> print_access a
+  | FLambda (l, a, pack) -> p "<closure '%s' of %d args, packing %s)>" l a (List.fold_left (fun x y -> x ^ " " ^ (print_access y)) "(" pack)
+  | FCont (l, pack) -> p "<continuation closure '%s' of 1 arg, packing %s)>" l (List.fold_left (fun x y -> x ^ " " ^ (print_access y)) "(" pack)
 
 let rec print_flat info = function
-  | FApp (f, args, k) -> p "(%s %s %s)" (print_flat_val info f) (List.fold_left (fun x y -> x ^ " " ^ (print_flat_val info y)) "" args) (print_flat_val info k)
-  | FCApp (k, v) -> p "(%s %s)" (print_flat_val info k) (print_flat_val info v)
-  | FIf (v, e1, e2) -> p "(if %s %s %s)" (print_flat_val info v) (print_flat info e1) (print_flat info e2)
-  | FPrimitive (prim, args, k) -> p "p(%s %s %s)" (primop prim) (List.fold_left (fun x y -> x ^ " " ^ (print_flat_val info y)) "" args) (print_flat_val info k)
-  | FHalt v -> p "%s" (print_flat_val info v)
-  | FHaltIntoGlobal (v, i) -> p "(set-global! %d %s " i (print_flat_val info v)
+  | FApp (f, args, k) -> p "(%s %s %s)" (print_flat_val f) (List.fold_left (fun x y -> x ^ " " ^ (print_flat_val y)) "" args) (print_flat_val k)
+  | FCApp (k, v) -> p "(%s %s)" (print_flat_val k) (print_flat_val v)
+  | FIf (v, e1, e2) -> p "(if %s %s %s)" (print_flat_val v) (print_flat info e1) (print_flat info e2)
+  | FPrimitive (prim, args, k) -> p "p(%s %s %s)" (primop prim) (List.fold_left (fun x y -> x ^ " " ^ (print_flat_val y)) "" args) (print_flat_val k)
+  | FHalt v -> p "%s" (print_flat_val v)
+  | FHaltIntoGlobal (v, i) -> p "(set-global! %d %s " i (print_flat_val v)
+
 
 let rec freevar_value globals args = function
   | Literal _ -> []
@@ -217,28 +213,28 @@ and freevar_expr globals args = function
   | HaltIntoGlobal (v, _) -> freevar_value globals args v
     
 
-let rec flatten_val (info : Static.info) env funs = function
+let rec flatten_val (info : Static.info) (env : flat_access StringMap.t) funs = function
   | Literal l -> FLiteral l
-  | Var v -> FVar (Hashtbl.find env v)
+  | Var v -> FVar (StringMap.find v env)
   | Lambda (args, karg, body) ->
      let label = gensym "lambda" in
      let to_pack = List.sort_uniq (String.compare) (freevar_expr info.globals (karg :: args) body) in
-     let before_pack = List.map (Hashtbl.find env) to_pack in
-     List.iteri (fun i a -> Hashtbl.add env a (Arg i)) args;
-     List.iteri (fun i s -> Hashtbl.add env s (Env i)) to_pack;
-     Hashtbl.add env karg (Arg (List.length args));
+     let before_pack = List.map (fun s -> StringMap.find s env) to_pack in
+     let (env, i) = List.fold_left (fun (e, i) a -> (StringMap.add a (Arg i) e, i + 1)) (env, 0) args in
+     let (env, _) = List.fold_left (fun (e, i) s -> (StringMap.add s (Env i) e, i + 1)) (env, 0) to_pack in
+     let env = StringMap.add karg (Arg i) env in
      Queue.add (label, (List.length args) + 1, closure_convert info env funs body) funs;
      FLambda (label, (List.length args) + 1, before_pack)
   | Cont (karg, body) ->
      let label = gensym "continuation" in
      let to_pack = List.sort_uniq (String.compare) (freevar_expr info.globals (karg :: []) body) in
-     let before_pack = List.map (Hashtbl.find env) to_pack in
-     Hashtbl.add env karg (Arg 0);
-     List.iteri (fun i s -> Hashtbl.add env s (Env i)) to_pack;
+     let before_pack = List.map (fun s -> StringMap.find s env) to_pack in
+     let env = StringMap.add karg (Arg 0) env in
+     let (env, _) = List.fold_left (fun (e, i) s -> (StringMap.add s (Env i) e, i + 1)) (env, 0) to_pack in
      Queue.add (label, 1, closure_convert info env funs body) funs;
      FCont (label, before_pack)
 
-and closure_convert info (env : (string, flat_access) Hashtbl.t) (funs : (flat_label * int * flat_expr) Queue.t) e =
+and closure_convert info (env : flat_access StringMap.t) (funs : (flat_label * int * flat_expr) Queue.t) e =
   let self x = closure_convert info env funs x in
   let flatten v = flatten_val info env funs v in
   match e with
@@ -268,15 +264,14 @@ let print_info i =
 let top_level e =
   let* info = Static.extract_info e in
   let toplevel = List.map (fun e -> cps e (fun v -> Halt v)) info.toplevel in
-  let env = Hashtbl.create 256 in
-  Hashtbl.(Seq.iter (fun (s, _) -> add env s (Global (find info.globals s))) (to_seq info.defs));
+  let env = StringMap.empty in
+  let env = (Hashtbl.fold (fun s _ e -> StringMap.add s (Global (Hashtbl.find info.globals s)) e) info.defs env) in
   let funs = Queue.create () in
   let defs = Hashtbl.create 256 in
   Hashtbl.(Seq.iter (fun (s, e) -> add defs s (closure_convert info env funs (cps e (fun v -> HaltIntoGlobal (v, find info.globals s))))) (to_seq info.defs));
   let toplevel = List.map (closure_convert info env funs) toplevel in
   let new_info = {
       defs;
-      env;
       funs;
       globals=info.globals;
       toplevel;
