@@ -37,8 +37,14 @@ type instr =
   | Const of access * int
   | If of access * int * int
   | Halt of access
+  | Print
   | Add
   | Sub
+  | Mul
+  | Div
+  | PushMeta of access
+  | MetaReturn of access
+
 
 
 type vm = {
@@ -73,8 +79,13 @@ let string_of_instr = function
   | Const (a, i) -> "Const "^string_of_acc a^", "^string_of_int i
   | If (a, i1, i2) -> "If "^string_of_acc a^", "^string_of_int i1^", "^string_of_int i2
   | Halt a -> "Halt "^string_of_acc a
+  | Print -> "Print"
   | Add -> "Add"
   | Sub -> "Sub"
+  | Mul -> "Mul"
+  | Div -> "Div"
+  | PushMeta a -> "PushMeta "^string_of_acc a
+  | MetaReturn a -> "MetaReturn "^string_of_acc a
 
 let print_instrs state =
   Iarray.iteri (fun i ins -> print_endline (string_of_int i^": "^string_of_instr ins)) state.instrs
@@ -106,6 +117,13 @@ let put vm target v =
   | Global i -> Array.set vm.globals i v
   | Arg i -> add_dynarray vm.next_args i v
   | Env i -> add_dynarray vm.next_env i v
+
+let pop_meta vm =
+  match vm.meta_stack with
+  | [] -> failwith "Tried to pop from empty meta-stack"
+  | one :: rest ->
+     vm.meta_stack <- rest;
+     one
 
 let is_truthy = function
   | Nil -> false
@@ -151,7 +169,26 @@ let rec interpret vm =
   | Halt acc ->
      let v = do_access vm acc in
      print_endline (print_val v)
+  | Print -> failwith "PRINT TRIGGERED"
   | Add -> failwith "ADD TRIGGERED"
   | Sub -> failwith "SUB TRIGGERED"
+  | Mul -> failwith "MUL"
+  | Div -> failwith "DIV"
+  | PushMeta acc ->
+     vm.meta_stack <- ((do_access vm acc) :: vm.meta_stack);
+     interpret vm
+  | MetaReturn acc ->
+     let cont = pop_meta vm in
+     let arg = do_access vm acc in
+     put vm (Arg 0) arg;
+     (match cont with
+     | Closure (i, env)
+       | Continuation (i, env) ->
+        vm.args <- Dynarray.to_array vm.next_args;
+        vm.next_args <- Dynarray.create ();
+        vm.i <- i;
+        vm.env <- env;
+     | v -> failwith ("cannot metareturn on "^print_val v));
+     interpret vm
 
   

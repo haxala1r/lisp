@@ -23,6 +23,8 @@ type expr =
   | If of expr * expr * expr
   | Var of string
   | Apply of expr * expr list
+  | Reset of body
+  | Shift of string * body
 and def = string * expr
 and body = def list * expr list
 
@@ -206,6 +208,20 @@ and builtin_quote cons =
     | LNil -> (LitNil) in
   lit (aux expr)
 
+and builtin_reset cons =
+  let* body = sexpr_cdr cons in
+  let* body = parse_body body in
+  exp (Reset body)
+
+and builtin_shift cons =
+  let* sym = sexpr_cadr cons in
+  let* body = sexpr_cddr cons in
+  let* body = parse_body body in
+  match sym with
+  | LSymbol s ->
+     exp (Shift (s, body))
+  | _ -> Error "shift expects a symbol to bind the continuation to"
+
 and apply f args =
   let* args = list_of_sexpr args in
   let* args = traverse (fun x -> unwrap_exp (transform x)) args in
@@ -220,6 +236,8 @@ and builtin_symbol = function
   | "COND" -> builtin_cond
   | "IF" -> builtin_if
   | "QUOTE" -> builtin_quote
+  | "RESET" -> builtin_reset
+  | "SHIFT" -> builtin_shift
   | _ -> (function
        | LCons (f, args) -> apply f args
        | _ -> Error "Invalid function application!")
@@ -315,6 +333,8 @@ and print_expr = function
      pf "(apply %s %s)"
        (print_expr f)
        ("(" ^ (String.concat " " (map print_expr exprs)) ^ ")")
+  | Reset (defs, exprs) -> pf "(reset %s\n%s)" (print_defs defs) (print_exprs exprs)
+  | Shift (_, _) -> pf "shift"
 (* | _ -> "WHATEVER" *)
 and print_exprs l =
   String.concat "\n" (map print_expr l)

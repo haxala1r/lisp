@@ -5,13 +5,12 @@ type literal = Core_ast.literal
 
 (* primitive operations *)
 type primop =
+  | Print
+(* Math *)
   | Add
   | Sub
   | Mul
   | Div
-(* These are the delimited continuation operators *)
-  | Shift
-  | Reset
 
 (* Trivial values *)
 type value =
@@ -37,6 +36,9 @@ and expr =
   | Halt of value
   | HaltIntoGlobal of value * int
 
+  | ResetBoundary of value * expr  (* pair of current continuation and the body *)
+  | MetaReturn of value
+
 (* debug prints *)
 let p = Printf.sprintf
 let rec print_literal = function
@@ -48,20 +50,18 @@ let rec print_literal = function
   | (Cons (a, b)) -> p "(%s . %s)" (print_literal a) (print_literal b)
 
 let primop = function
+  | Print -> "print"
   | Add -> "+"
   | Sub -> "-"
   | Mul -> "*"
   | Div -> "/"
-  | Shift -> "SHIFT"
-  | Reset -> "RESET"
 
 let primop_of_string = function
+  | "PRINT" -> Some Print 
   | "+" -> Some Add
   | "-" -> Some Sub
   | "*" -> Some Mul
   | "/" -> Some Div
-  | "SHIFT" -> Some Shift
-  | "RESET" -> Some Reset
   | _ -> None
 
 let primop_or_f args k s =
@@ -83,6 +83,8 @@ and print_expr = function
   | Primitive (prim, args, k) -> p "p(%s %s %s)" (primop prim) (List.fold_left (fun x y -> x ^ " " ^ (print_value y)) "" args) (print_value k)
   | Halt v -> print_value v
   | HaltIntoGlobal (v, i) -> p "(set-global! %i %s)" i (print_value v)
+  | ResetBoundary (v, e) -> p "<reset-boundary %s %s>" (print_value v) (print_expr e)
+  | MetaReturn (v) -> p "(meta-return %s)" (print_value v)
 
 
 let rec sub_symbol_in_expr s target =
@@ -100,6 +102,11 @@ let rec sub_symbol_in_expr s target =
      Core_ast.If (self e1, self e2, self e3)
   | Core_ast.Begin (es) ->
      Core_ast.Begin (List.map self es)
+  | Core_ast.Shift (binding, e) ->
+     let e = self e in
+     Core_ast.Shift (binding, e)
+  | Core_ast.Reset e ->
+     Core_ast.Reset (self e)
   | rest -> rest
 
 let gensym = Gensym.gensym
@@ -145,6 +152,14 @@ let rec cps (e : Core_ast.expression) (k : value -> expr) : expr =
        cps e k
     | Begin (e :: rest) ->
        cps e (fun _ -> cps (Begin rest) k)
+    | Reset b ->
+       let res = gensym "reset_ret" in
+       let k_val = Cont (res, k (Var res)) in
+       ResetBoundary (k_val, cps b (fun v -> MetaReturn v))
+    | Shift (kvar, e) ->
+       let res = gensym "shift_del" in
+       let k_del = Cont (res, k (Var res)) in
+       CApp (Cont (kvar, cps e (fun v -> MetaReturn v)), k_del)
   )
 
 (*
@@ -169,6 +184,8 @@ type flat_expr =
   | FPrimitive of primop * flat_value list * flat_value
   | FHalt of flat_value
   | FHaltIntoGlobal of flat_value * int
+  | FResetBoundary of flat_value * flat_expr
+  | FMetaReturn of flat_value
 
 type info = {
     defs : (flat_label, flat_expr) Hashtbl.t;
@@ -196,6 +213,8 @@ let rec print_flat info = function
   | FPrimitive (prim, args, k) -> p "p(%s %s %s)" (primop prim) (List.fold_left (fun x y -> x ^ " " ^ (print_flat_val y)) "" args) (print_flat_val k)
   | FHalt v -> p "%s" (print_flat_val v)
   | FHaltIntoGlobal (v, i) -> p "(set-global! %d %s " i (print_flat_val v)
+  | FResetBoundary (v, e) -> p "<reset %s %s>" (print_flat_val v) (print_flat info e)
+  | FMetaReturn v -> p "(meta-return %s)" (print_flat_val v)
 
 
 let rec freevar_value globals args = function
@@ -227,6 +246,10 @@ and freevar_expr globals args = function
        (freevar_value globals args k)
   | Halt v -> freevar_value globals args v
   | HaltIntoGlobal (v, _) -> freevar_value globals args v
+  | ResetBoundary (v, e) ->
+     (freevar_value globals args v) @
+       (freevar_expr globals args e)
+  | MetaReturn v -> freevar_value globals args v
     
 
 let rec flatten_val (info : Static.info) (env : flat_access StringMap.t) funs = function
@@ -262,7 +285,8 @@ and closure_convert info (env : flat_access StringMap.t) (funs : (flat_label * i
      FPrimitive (p, List.map flatten args, flatten k)
   | Halt v -> FHalt (flatten v)
   | HaltIntoGlobal (v, i) -> FHaltIntoGlobal (flatten v, i)
-
+  | ResetBoundary (v, e) -> FResetBoundary (flatten v, self e)
+  | MetaReturn v -> FMetaReturn (flatten v)
 
 let print_info i =
   print_endline "Definitions:";

@@ -25,7 +25,7 @@ let rec collect_globals f i = function
   | Core_ast.Expr _ :: rest ->
      collect_globals f i rest
 
-let default_globals = ["+"; "-"]
+let default_globals = ["PRINT";"+"; "-"; "*";"/";"SHIFT";"RESET"]
 
 (* extract global definitions from a program.
    Symbols that are not defined cannot be used at all.
@@ -80,6 +80,13 @@ let rec alpha_convert gensym get_global bindings =
      let* e2 = self bindings e2 in
      let* e3 = self bindings e3 in
      Ok (If (e1, e2, e3))
+  | Reset b ->
+     let* b = (self bindings b) in
+     Ok (Reset b)
+  | Shift (k, b) ->
+     let ks = gensym k in
+     let* b = self ([(k, ks)] :: bindings) (b) in
+     Ok (Shift (ks, b))
                                    )
 
 let alpha_convert_top global_table = function

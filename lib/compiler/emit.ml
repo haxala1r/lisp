@@ -37,9 +37,12 @@ let compile_access state into = function
 let emit_primop state =
   let e = emit_instr state in
   function
+  | Cps.Print -> e Vm.Print
   | Cps.Add -> e Vm.Add
   | Cps.Sub -> e Vm.Sub
-  | _ -> failwith "unknown primitive"
+  | Cps.Mul -> e Vm.Mul
+  | Cps.Div -> e Vm.Div
+(*| _ -> failwith "unknown primitive"*)
 
 let compile_value state into = function
   | Cps.FLiteral l -> emit_instr state (Vm.Const (into, add state.consts (make_vm_val l)))
@@ -83,6 +86,13 @@ let rec compile_one state = function
   | Cps.FHaltIntoGlobal (v, i) ->
      compile_value state (Vm.Global i) v
      (*emit_instr state (Vm.Halt (Vm.Global i))*)
+  | Cps.FResetBoundary (v, e) ->
+     compile_value state (Vm.Tmp) v;
+     emit_instr state (Vm.PushMeta Vm.Tmp);
+     compile_one state e
+  | Cps.FMetaReturn v ->
+     compile_value state (Vm.Tmp) v;
+     emit_instr state (Vm.MetaReturn Vm.Tmp)
 
 let compile_func state label body =
   let i = current_i state in

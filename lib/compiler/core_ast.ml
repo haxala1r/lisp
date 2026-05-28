@@ -22,6 +22,8 @@ type expression =
   | Let of string * expression * expression
   | If of expression * expression * expression
   | Begin of expression list
+  | Reset of expression
+  | Shift of string * expression
 
 type top_level =
   | Define of string * expression
@@ -88,6 +90,8 @@ and of_expr : Syntactic_ast.expr -> expression = function
   | If (e1, e2, e3) ->
      If (of_expr e1, of_expr e2, of_expr e3)
   | Apply (f, es) -> Apply (of_expr f, List.map of_expr es)
+  | Reset b -> Reset (of_body b)
+  | Shift (s, b) -> Shift (s, of_body b)
 
 
 and of_syntactic : Syntactic_ast.top_level -> top_level = function

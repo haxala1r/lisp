@@ -1,7 +1,6 @@
 
 let ( let* ) = Result.bind
-let src = "(define (f x) (- 1 x)) (define (g x) x)
-           (if 5 (f 5) (g 6))"
+let src = "(reset ())"
 let c = Compiler.Core_ast.of_src src
 let _ = (match (
           let* c = c in
