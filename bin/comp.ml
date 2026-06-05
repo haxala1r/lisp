@@ -2,7 +2,7 @@
 let ( let* ) = Result.bind
 
 
-let src = "(print (/ 1 2.0))"
+let src = read_line ()
 let c = Compiler.Core_ast.of_src src
 let _ = (match (
           let* c = c in
@@ -11,4 +11,4 @@ let _ = (match (
           Vm.print_instrs v;
           Ok (Vm.interpret v)) with
         | Ok () -> () 
-        | Error s -> failwith ("noo: " ^ s))
+        | Error s -> failwith ("error: " ^ s))
