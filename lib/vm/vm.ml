@@ -141,6 +141,37 @@ let is_truthy = function
   | Nil -> false
   | _ -> true
 
+let try_unwrap_ints v1 v2 =
+  match v1 with
+  | Int x ->
+     (match v2 with
+     | Int y -> Some (x, y)
+     | _ -> None
+     )
+  | _ -> None
+
+let try_unwrap_floats v1 v2 =
+  match v1 with
+  | Int x ->
+     (match v2 with
+     | Double y -> Some (float_of_int x, y)
+     | _ -> None)
+  | Double x ->
+     (match v2 with
+     | Int y -> Some (x, float_of_int y)
+     | Double y -> Some (x, y)
+     | _ -> None)
+  | _ -> None
+
+let binop io fo v1 v2 =
+  (match try_unwrap_ints v1 v2 with
+  | Some (x, y) -> Int (io x y)
+  | None ->
+     (match try_unwrap_floats v1 v2 with
+     | Some (x, y) -> Double (fo x y)
+     | None -> failwith "can't unwrap numbers"))
+
+
 let rec interpret vm =
   let i = vm.i in
   (*print_vm vm;*)
@@ -173,6 +204,7 @@ let rec interpret vm =
        vm.i <- e); interpret vm
   | Halt acc ->
      let v = do_access vm acc in
+     print_endline "";
      print_endline (print_val v)
   | Print ->
      let v = Dynarray.get vm.next_args 0 in
@@ -181,10 +213,39 @@ let rec interpret vm =
      vm.next_args <- Dynarray.of_list [v];
      invoke vm k;
      interpret vm
-  | Add -> failwith "ADD TRIGGERED"
-  | Sub -> failwith "SUB TRIGGERED"
-  | Mul -> failwith "MUL"
-  | Div -> failwith "DIV"
+  | Add ->
+     let v1 = Dynarray.get vm.next_args 0 in
+     let v2 = Dynarray.get vm.next_args 1 in
+     let k = Dynarray.get vm.next_args 2 in
+     let res = binop (+) (+.) v1 v2 in
+     vm.next_args <- Dynarray.of_list [res];
+     invoke vm k;
+     interpret vm
+     
+  | Sub ->
+     let v1 = Dynarray.get vm.next_args 0 in
+     let v2 = Dynarray.get vm.next_args 1 in
+     let k = Dynarray.get vm.next_args 2 in
+     let res = binop (-) (-.) v1 v2 in
+     vm.next_args <- Dynarray.of_list [res];
+     invoke vm k;
+     interpret vm
+  | Mul ->
+     let v1 = Dynarray.get vm.next_args 0 in
+     let v2 = Dynarray.get vm.next_args 1 in
+     let k = Dynarray.get vm.next_args 2 in
+     let res = binop ( * ) ( *. ) v1 v2 in
+     vm.next_args <- Dynarray.of_list [res];
+     invoke vm k;
+     interpret vm
+  | Div ->
+     let v1 = Dynarray.get vm.next_args 0 in
+     let v2 = Dynarray.get vm.next_args 1 in
+     let k = Dynarray.get vm.next_args 2 in
+     let res = binop (/) (/.) v1 v2 in
+     vm.next_args <- Dynarray.of_list [res];
+     invoke vm k;
+     interpret vm
   | PushMeta acc ->
      vm.meta_stack <- ((do_access vm acc) :: vm.meta_stack);
      interpret vm
