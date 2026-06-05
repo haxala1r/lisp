@@ -42,6 +42,7 @@ type instr =
   | Sub
   | Mul
   | Div
+  | Eq
   | PushMeta of access
   | MetaReturn of access
 
@@ -84,6 +85,7 @@ let string_of_instr = function
   | Sub -> "Sub"
   | Mul -> "Mul"
   | Div -> "Div"
+  | Eq -> "Eq"
   | PushMeta a -> "PushMeta "^string_of_acc a
   | MetaReturn a -> "MetaReturn "^string_of_acc a
 
@@ -243,6 +245,16 @@ let rec interpret vm =
      let v2 = Dynarray.get vm.next_args 1 in
      let k = Dynarray.get vm.next_args 2 in
      let res = binop (/) (/.) v1 v2 in
+     vm.next_args <- Dynarray.of_list [res];
+     invoke vm k;
+     interpret vm
+  | Eq ->
+     let v1 = Dynarray.get vm.next_args 0 in
+     let v2 = Dynarray.get vm.next_args 1 in
+     let k = Dynarray.get vm.next_args 2 in
+     let res = if v1 = v2 then Symbol "t" else Nil in
+     print_endline (print_val v1);
+     print_endline (print_val v2);
      vm.next_args <- Dynarray.of_list [res];
      invoke vm k;
      interpret vm

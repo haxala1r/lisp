@@ -6,7 +6,8 @@ type literal = Core_ast.literal
 (* primitive operations *)
 type primop =
   | Print
-(* Math *)
+  (* Math *)
+  | Eq
   | Add
   | Sub
   | Mul
@@ -55,13 +56,15 @@ let primop = function
   | Sub -> "-"
   | Mul -> "*"
   | Div -> "/"
+  | Eq -> "eq"
 
 let primop_of_string = function
-  | "PRINT" -> Some Print 
+  | "PRINT" -> Some Print
   | "+" -> Some Add
   | "-" -> Some Sub
   | "*" -> Some Mul
   | "/" -> Some Div
+  | "EQ" -> Some Eq
   | _ -> None
 
 let primop_or_f args k s =

@@ -25,7 +25,7 @@ let rec collect_globals f i = function
   | Core_ast.Expr _ :: rest ->
      collect_globals f i rest
 
-let default_globals = ["PRINT";"+"; "-"; "*";"/";"SHIFT";"RESET"]
+let default_globals = ["PRINT";"+"; "-"; "*";"/";"SHIFT";"RESET";"EQ"]
 
 (* extract global definitions from a program.
    Symbols that are not defined cannot be used at all.

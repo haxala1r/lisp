@@ -42,6 +42,7 @@ let emit_primop state =
   | Cps.Sub -> e Vm.Sub
   | Cps.Mul -> e Vm.Mul
   | Cps.Div -> e Vm.Div
+  | Cps.Eq -> e Vm.Eq
 (*| _ -> failwith "unknown primitive"*)
 
 let compile_value state into = function
