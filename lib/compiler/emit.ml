@@ -114,9 +114,9 @@ let emit (info : Cps.info) : Vm.vm =
   List.iter (compile_one state) info.toplevel;
   let vm : Vm.vm = {
       i;
-      instrs = Iarray.of_array (Dynarray.to_array state.instrs);
+      instrs = Dynarray.to_array state.instrs;
       globals = state.globals;
-      constants = Iarray.of_array (Dynarray.to_array state.consts);
+      constants = Dynarray.to_array state.consts;
       args = Array.make 0 Vm.Nil;
       next_args = Dynarray.create ();
       env = Array.make 0 Vm.Nil;

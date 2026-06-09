@@ -50,9 +50,9 @@ type instr =
 
 type vm = {
     mutable i : int;
-    instrs : instr iarray;
+    instrs : instr array;
     globals : value array;
-    mutable constants : value iarray;
+    mutable constants : value array;
     mutable args : value array;
     mutable next_args : value Dynarray.t;
     mutable env : value array;
@@ -90,11 +90,11 @@ let string_of_instr = function
   | MetaReturn a -> "MetaReturn "^string_of_acc a
 
 let print_instrs state =
-  Iarray.iteri (fun i ins -> print_endline (string_of_int i^": "^string_of_instr ins)) state.instrs
+  Array.iteri (fun i ins -> print_endline (string_of_int i^": "^string_of_instr ins)) state.instrs
 
 let print_vm vm =
   print_endline "constants:";
-  Iarray.iteri (fun i v -> print_string (string_of_int i ^": "^print_val v^" | " )) vm.constants;
+  Array.iteri (fun i v -> print_string (string_of_int i ^": "^print_val v^" | " )) vm.constants;
   print_endline "globals:";
   Array.iteri (fun i v -> print_string (string_of_int i ^": "^print_val v^" | " )) vm.globals;
   print_endline "args:";
@@ -179,9 +179,9 @@ let rec interpret vm =
   (*print_vm vm;*)
   (*print_endline (string_of_int i);*)
   vm.i <- i + 1;
-  if (i >= Iarray.length vm.instrs) then ()
+  if (i >= Array.length vm.instrs) then ()
   else
-  match Iarray.get vm.instrs i with
+  match Array.get vm.instrs i with
   | MkClosure (target, index) ->
      let new_env = Dynarray.to_array vm.next_env in
      vm.next_env <- Dynarray.create ();
@@ -198,7 +198,7 @@ let rec interpret vm =
   | LoadInto (target, src) ->
      put vm target (do_access vm src); interpret vm
   | Const (dest, i) ->
-     put vm dest (Iarray.get vm.constants i); interpret vm
+     put vm dest (Array.get vm.constants i); interpret vm
   | If (cond, t, e) ->
      (if (is_truthy (do_access vm cond)) then
        vm.i <- t
